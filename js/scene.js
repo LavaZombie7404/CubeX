@@ -1,7 +1,4 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-export function initScene(container) {
+function initScene(container) {
     const width = container.clientWidth;
     const height = container.clientHeight;
 
@@ -17,7 +14,7 @@ export function initScene(container) {
     renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(renderer.domElement);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.minDistance = 2;
@@ -37,7 +34,7 @@ export function initScene(container) {
     return { scene, camera, renderer, controls };
 }
 
-export function animate(renderer, scene, camera, controls) {
+function animate(renderer, scene, camera, controls) {
     function loop() {
         requestAnimationFrame(loop);
         controls.update();

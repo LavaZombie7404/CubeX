@@ -1,13 +1,11 @@
-import * as THREE from 'three';
-
-const COLORS = {
+const PYRAMINX_COLORS = {
     red: 0xe94560,
     green: 0x4ecca3,
     blue: 0x3498db,
     yellow: 0xf1c40f
 };
 
-export function createPyraminx() {
+function createPyraminx() {
     const group = new THREE.Group();
 
     const h = Math.sqrt(2 / 3);
@@ -19,10 +17,10 @@ export function createPyraminx() {
     ];
 
     const faces = [
-        { verts: [0, 1, 2], color: COLORS.red },
-        { verts: [0, 2, 3], color: COLORS.green },
-        { verts: [0, 3, 1], color: COLORS.blue },
-        { verts: [1, 3, 2], color: COLORS.yellow }
+        { verts: [0, 1, 2], color: PYRAMINX_COLORS.red },
+        { verts: [0, 2, 3], color: PYRAMINX_COLORS.green },
+        { verts: [0, 3, 1], color: PYRAMINX_COLORS.blue },
+        { verts: [1, 3, 2], color: PYRAMINX_COLORS.yellow }
     ];
 
     faces.forEach(face => {
@@ -48,8 +46,6 @@ function subdivideFace(v0, v1, v2, divisions) {
         const rowStart1 = v0.clone().lerp(v2, row / divisions);
         const nextRowStart0 = v0.clone().lerp(v1, (row + 1) / divisions);
         const nextRowStart1 = v0.clone().lerp(v2, (row + 1) / divisions);
-
-        const trianglesInRow = row * 2 + 1;
 
         for (let col = 0; col <= row; col++) {
             const t = row === 0 ? 0 : col / row;
