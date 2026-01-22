@@ -320,6 +320,7 @@ function animateRotation(pieces, pivot, axis, targetAngle, duration, onComplete)
 function setupPyraminxControls() {
     document.addEventListener('keydown', function(e) {
         if (e.repeat) return;
+        if (typeof currentPuzzle === 'undefined' || currentPuzzle !== 'pyraminx') return;
 
         const key = e.key.toLowerCase();
         const shift = e.shiftKey;

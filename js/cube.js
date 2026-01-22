@@ -219,7 +219,7 @@ function animateCubeRotation(cubies, axis, targetAngle, duration, clockwise, onC
 function setupCubeControls() {
     document.addEventListener('keydown', function(e) {
         if (e.repeat) return;
-        if (typeof cubeState.group === 'undefined' || cubeState.group === null) return;
+        if (typeof currentPuzzle === 'undefined' || !currentPuzzle.startsWith('cube')) return;
 
         const key = e.key.toLowerCase();
         const shift = e.shiftKey;
