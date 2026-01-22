@@ -311,8 +311,7 @@ var flowerState = {
     svgSize: 450,
     cx: 225,
     cy: 225,
-    isAnimating: false,
-    animationQueue: [],
+    activeTimers: [],
     lastRotationClockwise: true
 };
 
@@ -537,95 +536,52 @@ function updateFlowerDots() {
         return;
     }
 
-    // Get previous colors for comparison
-    const previousColors = {};
-    Object.keys(flowerState.dotElements).forEach(dotId => {
-        const dotInfo = flowerState.dotElements[dotId];
-        if (dotInfo) {
-            previousColors[dotId] = dotInfo.currentColor;
-        }
-    });
+    // Cancel all running animations and snap dots to home positions
+    stopAllFlowerAnimations();
 
-    // Calculate new colors
-    const newColors = {};
+    // Get previous colors and calculate new colors
+    const changedDots = [];
     Object.keys(flowerState.dotElements).forEach(dotId => {
         const dotInfo = flowerState.dotElements[dotId];
         if (!dotInfo) return;
+
         const faceState = diagramState.faces[dotInfo.face];
         if (!faceState || !faceState[dotInfo.row]) return;
-        newColors[dotId] = faceState[dotInfo.row][dotInfo.col];
-    });
 
-    // Queue the animation
-    const clockwise = flowerState.lastRotationClockwise;
-    flowerState.animationQueue.push({ previousColors, newColors, clockwise });
-
-    // Process queue if not already animating
-    if (!flowerState.isAnimating) {
-        processFlowerAnimationQueue();
-    }
-}
-
-function processFlowerAnimationQueue() {
-    if (flowerState.animationQueue.length === 0) {
-        flowerState.isAnimating = false;
-        return;
-    }
-
-    flowerState.isAnimating = true;
-    const { previousColors, newColors, clockwise } = flowerState.animationQueue.shift();
-    flowerState.lastRotationClockwise = clockwise;
-
-    animateFlowerTransition(previousColors, newColors, function() {
-        processFlowerAnimationQueue();
-    });
-}
-
-function animateFlowerTransition(previousColors, newColors, onComplete) {
-    const changedDots = [];
-
-    Object.keys(newColors).forEach(dotId => {
-        if (previousColors[dotId] !== newColors[dotId]) {
-            changedDots.push({
-                id: dotId,
-                oldColor: previousColors[dotId],
-                newColor: newColors[dotId],
-                info: flowerState.dotElements[dotId]
-            });
+        const newColor = faceState[dotInfo.row][dotInfo.col];
+        if (dotInfo.currentColor !== newColor) {
+            changedDots.push({ dotId, dotInfo, newColor });
         }
     });
 
-    if (changedDots.length === 0) {
-        if (onComplete) onComplete();
-        return;
-    }
+    if (changedDots.length === 0) return;
 
+    // Animate all changed dots
     const duration = 400;
-    let completedCount = 0;
-
-    changedDots.forEach((dot) => {
-        const dotInfo = dot.info;
-
-        if (!dotInfo) {
-            completedCount++;
-            if (completedCount >= changedDots.length && onComplete) onComplete();
-            return;
-        }
-
+    changedDots.forEach(({ dotId, dotInfo, newColor }) => {
         const circleCenter = getCircleCenterForDot(dotInfo);
-
         if (circleCenter) {
-            animateDotAlongArc(dot.id, dotInfo, circleCenter, dot.newColor, duration, function() {
-                completedCount++;
-                if (completedCount >= changedDots.length && onComplete) onComplete();
-            });
+            animateDotAlongArc(dotId, dotInfo, circleCenter, newColor, duration);
         } else {
-            d3.select('#' + dot.id).attr('fill', dot.newColor);
-            completedCount++;
-            if (completedCount >= changedDots.length && onComplete) onComplete();
+            d3.select('#' + dotId).attr('fill', newColor);
         }
+        dotInfo.currentColor = newColor;
+    });
+}
 
-        dotInfo.currentColor = dot.newColor;
+function stopAllFlowerAnimations() {
+    // Stop all running timers
+    flowerState.activeTimers.forEach(timer => timer.stop());
+    flowerState.activeTimers = [];
+
+    // Snap all dots to their correct home positions
+    Object.keys(flowerState.dotElements).forEach(dotId => {
+        const dotInfo = flowerState.dotElements[dotId];
+        if (dotInfo) {
+            d3.select('#' + dotId)
+                .attr('cx', dotInfo.x)
+                .attr('cy', dotInfo.y);
+        }
     });
 }
 
@@ -649,26 +605,24 @@ function getCircleCenterForDot(dotInfo) {
     return flowerState.groupCenters[groupIdx];
 }
 
-function animateDotAlongArc(dotId, dotInfo, center, newColor, duration, onComplete) {
+function animateDotAlongArc(dotId, dotInfo, center, newColor, duration) {
     const element = d3.select('#' + dotId);
-    if (element.empty()) {
-        if (onComplete) onComplete();
-        return;
-    }
+    if (element.empty()) return;
 
-    const startX = parseFloat(element.attr('cx'));
-    const startY = parseFloat(element.attr('cy'));
+    // Use stored home position, not DOM position
+    const homeX = dotInfo.x;
+    const homeY = dotInfo.y;
 
     const radius = Math.sqrt(
-        Math.pow(startX - center.x, 2) + Math.pow(startY - center.y, 2)
+        Math.pow(homeX - center.x, 2) + Math.pow(homeY - center.y, 2)
     );
-    const startAngle = Math.atan2(startY - center.y, startX - center.x);
+    const startAngle = Math.atan2(homeY - center.y, homeX - center.x);
 
     // Full circle in rotation direction
     const clockwise = flowerState.lastRotationClockwise !== false;
     const arcAngle = clockwise ? -Math.PI * 2 : Math.PI * 2;
 
-    d3.timer(function(elapsed) {
+    const timer = d3.timer(function(elapsed) {
         const progress = Math.min(elapsed / duration, 1);
 
         // Linear movement - no easing
@@ -683,12 +637,14 @@ function animateDotAlongArc(dotId, dotInfo, center, newColor, duration, onComple
         }
 
         if (progress >= 1) {
-            element.attr('cx', startX).attr('cy', startY);
-            if (onComplete) onComplete();
+            element.attr('cx', homeX).attr('cy', homeY);
             return true;
         }
         return false;
     });
+
+    // Track timer so we can cancel it
+    flowerState.activeTimers.push(timer);
 }
 
 // ============ UPDATE FROM 3D CUBE ============
