@@ -71,6 +71,11 @@ function setupPuzzleSelector() {
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'block';
             initDiagram(3);
+        } else if (puzzle === 'cube4') {
+            currentPuzzleGroup = createCube(4);
+            pyraminxMoves.style.display = 'none';
+            cubeMoves.style.display = 'block';
+            initDiagram(4);
         }
 
         sceneRef.add(currentPuzzleGroup);
