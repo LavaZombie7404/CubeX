@@ -147,160 +147,359 @@ function renderNetFace(svg, faceName, offsetX, offsetY) {
     }
 }
 
-// ============ CIRCULAR DIAGRAM ============
+// ============ CIRCULAR DIAGRAM (Concentric Circles) ============
+// 3 groups of concentric circles at 120° angles
+// Dots positioned at actual circle-circle intersections
+
+var circularState = {
+    dotElements: {},
+    groupCenters: [],
+    radii: [],
+    svgSize: 450,
+    cx: 225,
+    cy: 225,
+    activeTimers: [],
+    lastRotationClockwise: true
+};
+
 function renderCircularDiagram() {
     const container = document.getElementById('cube-diagram');
     if (!container) return;
 
     container.innerHTML = '';
+    circularState.dotElements = {};
 
     const size = diagramState.size;
-    const svgSize = 280;
-    const centerX = svgSize / 2;
-    const centerY = svgSize / 2;
-    const innerRadius = svgSize * 0.15;
-    const outerRadius = svgSize * 0.42;
+    const svgSize = 450;
+    const cx = svgSize / 2;
+    const cy = svgSize / 2;
+    const dotRadius = size === 2 ? 8 : 6;
+
+    // Store for animation calculations
+    circularState.svgSize = svgSize;
+    circularState.cx = cx;
+    circularState.cy = cy;
+    circularState.dotRadius = dotRadius;
 
     const svg = d3.select(container)
         .append('svg')
         .attr('viewBox', `0 0 ${svgSize} ${svgSize}`)
         .attr('preserveAspectRatio', 'xMidYMid meet');
 
-    diagramState.svg = svg;
-
-    // Center face (front)
-    renderCenterFace(svg, centerX, centerY, innerRadius * 0.85);
-
-    // Surrounding faces
-    const surroundingFaces = [
-        { name: 'top', angle: -90 },
-        { name: 'right', angle: 0 },
-        { name: 'bottom', angle: 90 },
-        { name: 'left', angle: 180 }
+    // 3 circle group centers at 120° angles - smaller triangle
+    const groupDistance = svgSize * 0.12;  // Reduced from 0.22
+    const groupCenters = [
+        { x: cx, y: cy - groupDistance },                                    // Top (Group A)
+        { x: cx - groupDistance * 0.866, y: cy + groupDistance * 0.5 },      // Bottom-left (Group B)
+        { x: cx + groupDistance * 0.866, y: cy + groupDistance * 0.5 }       // Bottom-right (Group C)
     ];
+    circularState.groupCenters = groupCenters;
 
-    surroundingFaces.forEach(face => {
-        renderRadialFace(svg, face.name, centerX, centerY, innerRadius, outerRadius, face.angle);
+    // Circle radii - larger to ensure proper intersections
+    const baseRadius = svgSize * 0.18;
+    const radiusStep = svgSize * 0.055;
+    const radii = [];
+    for (let i = 0; i < size; i++) {
+        radii.push(baseRadius + i * radiusStep);
+    }
+    circularState.radii = radii;
+
+    // Draw the 3 groups of concentric circles
+    const circlesGroup = svg.append('g').attr('class', 'circular-circles');
+
+    groupCenters.forEach((center, groupIdx) => {
+        radii.forEach((radius, layerIdx) => {
+            circlesGroup.append('circle')
+                .attr('cx', center.x)
+                .attr('cy', center.y)
+                .attr('r', radius)
+                .attr('fill', 'none')
+                .attr('stroke', '#555')
+                .attr('stroke-width', 1);
+        });
     });
 
-    // Back face indicator
-    renderBackFaceIndicator(svg, centerX, centerY, outerRadius);
+    // Calculate intersection points for each face
+    const faceConfigs = calculateCircleIntersections(groupCenters, radii, size, cx, cy);
+
+    // Draw connecting lines between adjacent dots
+    const linesGroup = svg.append('g').attr('class', 'circular-lines');
+    drawCircularConnections(linesGroup, faceConfigs, size);
+
+    // Draw dots at intersection points
+    const dotsGroup = svg.append('g').attr('class', 'circular-dots');
+    drawCircularDots(dotsGroup, faceConfigs, size, dotRadius);
 }
 
-function renderCenterFace(svg, cx, cy, radius) {
-    const size = diagramState.size;
-    const faceState = diagramState.faces.front;
-    const cellSize = (radius * 2) / size;
-    const startX = cx - radius;
-    const startY = cy - radius;
+// Calculate actual circle-circle intersection points
+function circleIntersection(c1x, c1y, r1, c2x, c2y, r2) {
+    const dx = c2x - c1x;
+    const dy = c2y - c1y;
+    const d = Math.sqrt(dx * dx + dy * dy);
 
-    const group = svg.append('g').attr('class', 'face-center');
-
-    for (let row = 0; row < size; row++) {
-        for (let col = 0; col < size; col++) {
-            group.append('rect')
-                .attr('x', startX + col * cellSize)
-                .attr('y', startY + row * cellSize)
-                .attr('width', cellSize - 1)
-                .attr('height', cellSize - 1)
-                .attr('fill', faceState[row][col])
-                .attr('stroke', '#333')
-                .attr('stroke-width', 1)
-                .attr('rx', 2);
-        }
+    // Check if circles intersect
+    if (d > r1 + r2 || d < Math.abs(r1 - r2) || d === 0) {
+        return null;
     }
 
-    group.append('text')
-        .attr('x', cx)
-        .attr('y', cy + radius + 10)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#666')
-        .attr('font-size', '9px')
-        .text('F');
+    const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+    const h = Math.sqrt(r1 * r1 - a * a);
+
+    const px = c1x + (a * dx) / d;
+    const py = c1y + (a * dy) / d;
+
+    // Two intersection points
+    return [
+        { x: px + (h * dy) / d, y: py - (h * dx) / d },
+        { x: px - (h * dy) / d, y: py + (h * dx) / d }
+    ];
 }
 
-function renderRadialFace(svg, faceName, cx, cy, innerR, outerR, angleDeg) {
-    const size = diagramState.size;
-    const faceState = diagramState.faces[faceName];
-    const angleRad = (angleDeg * Math.PI) / 180;
-    const arcSpan = 70;
-    const startAngle = angleDeg - arcSpan / 2;
-    const cellArcSpan = arcSpan / size;
-    const ringWidth = (outerR - innerR) / size;
+function calculateCircleIntersections(groupCenters, radii, size, cx, cy) {
+    // Face mapping: which two groups intersect and which intersection point to use
+    const faceMap = [
+        { name: 'right', g1: 0, g2: 1, pickClosestTo: { x: cx + 100, y: cy - 50 } },
+        { name: 'front', g1: 0, g2: 2, pickClosestTo: { x: cx - 100, y: cy - 50 } },
+        { name: 'top', g1: 1, g2: 2, pickClosestTo: { x: cx, y: cy - 100 } },
+        { name: 'left', g1: 0, g2: 1, pickClosestTo: { x: cx - 100, y: cy + 50 } },
+        { name: 'back', g1: 0, g2: 2, pickClosestTo: { x: cx + 100, y: cy + 50 } },
+        { name: 'bottom', g1: 1, g2: 2, pickClosestTo: { x: cx, y: cy + 100 } }
+    ];
 
-    const group = svg.append('g').attr('class', `face-radial face-${faceName}`);
+    const faceConfigs = {};
 
-    for (let row = 0; row < size; row++) {
-        for (let col = 0; col < size; col++) {
-            const r1 = innerR + row * ringWidth + 1;
-            const r2 = innerR + (row + 1) * ringWidth - 1;
-            const a1 = ((startAngle + col * cellArcSpan + 0.5) * Math.PI) / 180;
-            const a2 = ((startAngle + (col + 1) * cellArcSpan - 0.5) * Math.PI) / 180;
+    faceMap.forEach(face => {
+        const faceState = diagramState.faces[face.name];
+        const c1 = groupCenters[face.g1];
+        const c2 = groupCenters[face.g2];
 
-            const arc = d3.arc()
-                .innerRadius(r1)
-                .outerRadius(r2)
-                .startAngle(a1 + Math.PI / 2)
-                .endAngle(a2 + Math.PI / 2);
+        faceConfigs[face.name] = { dots: [] };
 
-            group.append('path')
-                .attr('d', arc)
-                .attr('transform', `translate(${cx}, ${cy})`)
-                .attr('fill', faceState[row][col])
-                .attr('stroke', '#333')
-                .attr('stroke-width', 1);
+        for (let row = 0; row < size; row++) {
+            faceConfigs[face.name].dots[row] = [];
+            for (let col = 0; col < size; col++) {
+                const r1 = radii[row];
+                const r2 = radii[col];
+
+                const intersections = circleIntersection(c1.x, c1.y, r1, c2.x, c2.y, r2);
+
+                let point = { x: cx, y: cy }; // fallback
+
+                if (intersections) {
+                    // Pick the intersection point closest to the target area
+                    const d1 = Math.hypot(intersections[0].x - face.pickClosestTo.x, intersections[0].y - face.pickClosestTo.y);
+                    const d2 = Math.hypot(intersections[1].x - face.pickClosestTo.x, intersections[1].y - face.pickClosestTo.y);
+                    point = d1 < d2 ? intersections[0] : intersections[1];
+                }
+
+                faceConfigs[face.name].dots[row][col] = {
+                    x: point.x,
+                    y: point.y,
+                    color: faceState[row][col],
+                    face: face.name,
+                    row: row,
+                    col: col,
+                    circleGroup1: face.g1,
+                    circleGroup2: face.g2,
+                    radius1: r1,
+                    radius2: r2
+                };
+            }
         }
-    }
+    });
 
-    const labelR = outerR + 10;
-    const labelX = cx + labelR * Math.cos(angleRad);
-    const labelY = cy + labelR * Math.sin(angleRad);
-    group.append('text')
-        .attr('x', labelX)
-        .attr('y', labelY)
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .attr('fill', '#666')
-        .attr('font-size', '9px')
-        .text(faceName.charAt(0).toUpperCase());
+    return faceConfigs;
 }
 
-function renderBackFaceIndicator(svg, cx, cy, outerR) {
-    const size = diagramState.size;
-    const faceState = diagramState.faces.back;
-    const indicatorSize = outerR * 0.25;
-    const indicatorX = cx + outerR + 15;
-    const indicatorY = cy - indicatorSize / 2;
-    const cellSize = indicatorSize / size;
+function drawCircularConnections(linesGroup, faceConfigs, size) {
+    Object.keys(faceConfigs).forEach(faceName => {
+        const dots = faceConfigs[faceName].dots;
 
-    const group = svg.append('g').attr('class', 'face-back-indicator');
-
-    for (let row = 0; row < size; row++) {
-        for (let col = 0; col < size; col++) {
-            group.append('rect')
-                .attr('x', indicatorX + col * cellSize)
-                .attr('y', indicatorY + row * cellSize)
-                .attr('width', cellSize - 1)
-                .attr('height', cellSize - 1)
-                .attr('fill', faceState[row][col])
-                .attr('stroke', '#333')
-                .attr('stroke-width', 0.5)
-                .attr('rx', 1);
+        // Horizontal connections
+        for (let row = 0; row < size; row++) {
+            for (let col = 0; col < size - 1; col++) {
+                linesGroup.append('line')
+                    .attr('x1', dots[row][col].x)
+                    .attr('y1', dots[row][col].y)
+                    .attr('x2', dots[row][col + 1].x)
+                    .attr('y2', dots[row][col + 1].y)
+                    .attr('stroke', '#444')
+                    .attr('stroke-width', 1);
+            }
         }
+
+        // Vertical connections
+        for (let row = 0; row < size - 1; row++) {
+            for (let col = 0; col < size; col++) {
+                linesGroup.append('line')
+                    .attr('x1', dots[row][col].x)
+                    .attr('y1', dots[row][col].y)
+                    .attr('x2', dots[row + 1][col].x)
+                    .attr('y2', dots[row + 1][col].y)
+                    .attr('stroke', '#444')
+                    .attr('stroke-width', 1);
+            }
+        }
+    });
+}
+
+function drawCircularDots(dotsGroup, faceConfigs, size, dotRadius) {
+    Object.keys(faceConfigs).forEach(faceName => {
+        const dots = faceConfigs[faceName].dots;
+
+        for (let row = 0; row < size; row++) {
+            for (let col = 0; col < size; col++) {
+                const dot = dots[row][col];
+                const dotId = `dot-${faceName}-${row}-${col}`;
+
+                const circle = dotsGroup.append('circle')
+                    .attr('id', dotId)
+                    .attr('cx', dot.x)
+                    .attr('cy', dot.y)
+                    .attr('r', dotRadius)
+                    .attr('fill', dot.color)
+                    .attr('stroke', '#111')
+                    .attr('stroke-width', 1.5);
+
+                circularState.dotElements[dotId] = {
+                    element: circle,
+                    x: dot.x,
+                    y: dot.y,
+                    face: faceName,
+                    row: row,
+                    col: col,
+                    currentColor: dot.color,  // Store current color for animation
+                    circleGroup1: dot.circleGroup1,
+                    circleGroup2: dot.circleGroup2
+                };
+            }
+        }
+    });
+}
+
+function updateCircularDots() {
+    if (!circularState.dotElements || Object.keys(circularState.dotElements).length === 0) {
+        renderCircularDiagram();
+        return;
     }
 
-    group.append('text')
-        .attr('x', indicatorX + indicatorSize / 2)
-        .attr('y', indicatorY + indicatorSize + 8)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#666')
-        .attr('font-size', '8px')
-        .text('B');
+    // Cancel all running animations and snap dots to home positions
+    stopAllCircularAnimations();
+
+    // Get previous colors and calculate new colors
+    const changedDots = [];
+    Object.keys(circularState.dotElements).forEach(dotId => {
+        const dotInfo = circularState.dotElements[dotId];
+        if (!dotInfo) return;
+
+        const faceState = diagramState.faces[dotInfo.face];
+        if (!faceState || !faceState[dotInfo.row]) return;
+
+        const newColor = faceState[dotInfo.row][dotInfo.col];
+        if (dotInfo.currentColor !== newColor) {
+            changedDots.push({ dotId, dotInfo, newColor });
+        }
+    });
+
+    if (changedDots.length === 0) return;
+
+    // Animate all changed dots
+    const duration = 400;
+    changedDots.forEach(({ dotId, dotInfo, newColor }) => {
+        const circleCenter = getCircleCenterForDot(dotInfo);
+        if (circleCenter) {
+            animateDotAlongArc(dotId, dotInfo, circleCenter, newColor, duration);
+        } else {
+            d3.select('#' + dotId).attr('fill', newColor);
+        }
+        dotInfo.currentColor = newColor;
+    });
+}
+
+function stopAllCircularAnimations() {
+    // Stop all running timers
+    circularState.activeTimers.forEach(timer => timer.stop());
+    circularState.activeTimers = [];
+
+    // Snap all dots to their correct home positions
+    Object.keys(circularState.dotElements).forEach(dotId => {
+        const dotInfo = circularState.dotElements[dotId];
+        if (dotInfo) {
+            d3.select('#' + dotId)
+                .attr('cx', dotInfo.x)
+                .attr('cy', dotInfo.y);
+        }
+    });
+}
+
+function getCircleCenterForDot(dotInfo) {
+    // Each face is at intersection of two circle groups
+    // Return one of the circle centers for arc animation
+    if (!circularState.groupCenters || circularState.groupCenters.length < 3) return null;
+
+    const faceToGroups = {
+        'right': 0,   // Use group 0 (top)
+        'left': 0,
+        'front': 0,
+        'back': 0,
+        'top': 1,     // Use group 1 (bottom-left)
+        'bottom': 1
+    };
+
+    const groupIdx = faceToGroups[dotInfo.face];
+    if (groupIdx === undefined) return null;
+
+    return circularState.groupCenters[groupIdx];
+}
+
+function animateDotAlongArc(dotId, dotInfo, center, newColor, duration) {
+    const element = d3.select('#' + dotId);
+    if (element.empty()) return;
+
+    // Use stored home position, not DOM position
+    const homeX = dotInfo.x;
+    const homeY = dotInfo.y;
+
+    const radius = Math.sqrt(
+        Math.pow(homeX - center.x, 2) + Math.pow(homeY - center.y, 2)
+    );
+    const startAngle = Math.atan2(homeY - center.y, homeX - center.x);
+
+    // Full circle in rotation direction
+    const clockwise = circularState.lastRotationClockwise !== false;
+    const arcAngle = clockwise ? -Math.PI * 2 : Math.PI * 2;
+
+    const timer = d3.timer(function(elapsed) {
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Linear movement - no easing
+        const currentAngle = startAngle + arcAngle * progress;
+        element
+            .attr('cx', center.x + radius * Math.cos(currentAngle))
+            .attr('cy', center.y + radius * Math.sin(currentAngle));
+
+        // Change color at halfway point
+        if (progress >= 0.5) {
+            element.attr('fill', newColor);
+        }
+
+        if (progress >= 1) {
+            element.attr('cx', homeX).attr('cy', homeY);
+            return true;
+        }
+        return false;
+    });
+
+    // Track timer so we can cancel it
+    circularState.activeTimers.push(timer);
 }
 
 // ============ UPDATE FROM 3D CUBE ============
-function updateDiagramFromCube() {
+function updateDiagramFromCube(clockwise) {
     if (!cubeState.cubies || cubeState.cubies.length === 0) return;
+
+    // Store rotation direction for animation
+    circularState.lastRotationClockwise = clockwise;
 
     const size = cubeState.size;
     diagramState.size = size;
@@ -351,7 +550,12 @@ function updateDiagramFromCube() {
         }
     });
 
-    renderCurrentView();
+    // For circular view, animate the transition; for others, re-render
+    if (diagramState.view === 'circular' && Object.keys(circularState.dotElements).length > 0) {
+        updateCircularDots();
+    } else {
+        renderCurrentView();
+    }
 }
 
 // Get the color of the face pointing in a world direction
