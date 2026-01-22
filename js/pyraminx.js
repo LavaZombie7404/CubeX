@@ -305,6 +305,11 @@ function animateRotation(pieces, pivot, axis, targetAngle, duration, onComplete)
                 piece.userData.wideLayers = layerAssignment.wideLayers;
             });
 
+            // Update 2D diagram
+            if (typeof updatePyraminxDiagram === 'function') {
+                updatePyraminxDiagram();
+            }
+
             if (onComplete) onComplete();
         }
     }

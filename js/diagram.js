@@ -612,9 +612,150 @@ function getFaceColor(cubie, worldDir) {
     return hex;
 }
 
+// ============ PYRAMINX DIAGRAM ============
+var pyraminxDiagramState = {
+    colors: {
+        front: '#e94560',   // red
+        right: '#4ecca3',   // green
+        left: '#3498db',    // blue
+        bottom: '#f1c40f'   // yellow
+    },
+    faces: {}
+};
+
 function initPyraminxDiagram() {
+    // Initialize face states with solved colors (9 stickers per face)
+    pyraminxDiagramState.faces = {
+        front: Array(9).fill(pyraminxDiagramState.colors.front),
+        right: Array(9).fill(pyraminxDiagramState.colors.right),
+        left: Array(9).fill(pyraminxDiagramState.colors.left),
+        bottom: Array(9).fill(pyraminxDiagramState.colors.bottom)
+    };
+
+    renderPyraminxDiagram();
+}
+
+function renderPyraminxDiagram() {
     const container = document.getElementById('cube-diagram');
     if (!container) return;
 
-    container.innerHTML = '<p style="color: #666; text-align: center; padding-top: 30px; font-size: 0.85rem;">Pyraminx diagram<br>coming soon</p>';
+    container.innerHTML = '';
+
+    const svgSize = 300;
+    const cx = svgSize / 2;
+    const cy = svgSize / 2;
+
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('viewBox', `0 0 ${svgSize} ${svgSize}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet');
+
+    // Face layout: front in center, left/right/bottom at 120° intervals
+    const faceSize = 50;
+    const outerDist = 65;
+
+    // Center face (front) - pointing up
+    renderPyraminxFace(svg, 'front', cx, cy, faceSize, 0);
+
+    // Bottom face - pointing down, at bottom
+    renderPyraminxFace(svg, 'bottom', cx, cy + outerDist, faceSize, 180);
+
+    // Left face - at top-left
+    const leftX = cx - outerDist * Math.sin(Math.PI / 3);
+    const leftY = cy - outerDist * Math.cos(Math.PI / 3);
+    renderPyraminxFace(svg, 'left', leftX, leftY, faceSize, -60);
+
+    // Right face - at top-right
+    const rightX = cx + outerDist * Math.sin(Math.PI / 3);
+    const rightY = cy - outerDist * Math.cos(Math.PI / 3);
+    renderPyraminxFace(svg, 'right', rightX, rightY, faceSize, 60);
+
+    // Labels
+    svg.append('text').attr('x', cx).attr('y', cy + faceSize * 0.15).attr('text-anchor', 'middle').attr('fill', '#666').attr('font-size', '9px').text('F');
+    svg.append('text').attr('x', cx).attr('y', cy + outerDist + faceSize * 0.15).attr('text-anchor', 'middle').attr('fill', '#666').attr('font-size', '9px').text('B');
+    svg.append('text').attr('x', leftX - faceSize * 0.4).attr('y', leftY + faceSize * 0.15).attr('text-anchor', 'middle').attr('fill', '#666').attr('font-size', '9px').text('L');
+    svg.append('text').attr('x', rightX + faceSize * 0.4).attr('y', rightY + faceSize * 0.15).attr('text-anchor', 'middle').attr('fill', '#666').attr('font-size', '9px').text('R');
+}
+
+function renderPyraminxFace(svg, faceName, cx, cy, size, rotation) {
+    const faceColors = pyraminxDiagramState.faces[faceName];
+    if (!faceColors) return;
+
+    const group = svg.append('g')
+        .attr('class', `pyraminx-face face-${faceName}`)
+        .attr('transform', `translate(${cx}, ${cy}) rotate(${rotation})`);
+
+    // Triangle dimensions
+    const h = size * Math.sqrt(3) / 2;
+    const rows = 3;
+    const triHeight = h / rows;
+    const triWidth = size / rows;
+
+    // Build triangles row by row
+    // Row 0: 1 triangle (index 0)
+    // Row 1: 3 triangles (indices 1,2,3)
+    // Row 2: 5 triangles (indices 4,5,6,7,8)
+    let stickerIndex = 0;
+
+    for (let row = 0; row < rows; row++) {
+        const rowY = -h / 2 + triHeight * (row + 0.5);
+        const numTris = 2 * row + 1;
+        const rowWidth = triWidth * (row + 1);
+
+        for (let col = 0; col < numTris; col++) {
+            const isDown = col % 2 === 0;
+            const triCenterX = -rowWidth / 2 + triWidth * (col + 1) / 2;
+
+            let points;
+            if (isDown) {
+                // Pointing down triangle
+                points = [
+                    [triCenterX - triWidth / 2, rowY - triHeight / 2],
+                    [triCenterX + triWidth / 2, rowY - triHeight / 2],
+                    [triCenterX, rowY + triHeight / 2]
+                ];
+            } else {
+                // Pointing up triangle
+                points = [
+                    [triCenterX, rowY - triHeight / 2],
+                    [triCenterX + triWidth / 2, rowY + triHeight / 2],
+                    [triCenterX - triWidth / 2, rowY + triHeight / 2]
+                ];
+            }
+
+            const pointsStr = points.map(p => p.join(',')).join(' ');
+            group.append('polygon')
+                .attr('points', pointsStr)
+                .attr('fill', faceColors[stickerIndex] || '#333')
+                .attr('stroke', '#222')
+                .attr('stroke-width', 1);
+
+            stickerIndex++;
+        }
+    }
+}
+
+function updatePyraminxDiagram() {
+    if (!pyraminxState.pieces || pyraminxState.pieces.length === 0) return;
+
+    // Reset faces
+    pyraminxDiagramState.faces = {
+        front: Array(9).fill(null),
+        right: Array(9).fill(null),
+        left: Array(9).fill(null),
+        bottom: Array(9).fill(null)
+    };
+
+    // Read colors from 3D pieces
+    pyraminxState.pieces.forEach(piece => {
+        const faceName = piece.userData.face;
+        const index = piece.userData.index;
+
+        if (faceName && index !== undefined && pyraminxDiagramState.faces[faceName]) {
+            const color = '#' + piece.material.color.getHexString();
+            pyraminxDiagramState.faces[faceName][index] = color;
+        }
+    });
+
+    renderPyraminxDiagram();
 }
