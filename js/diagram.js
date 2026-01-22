@@ -311,8 +311,9 @@ var flowerState = {
     svgSize: 450,
     cx: 225,
     cy: 225,
-    animating: false,
-    previousFaces: null  // Store previous state for animation
+    isAnimating: false,
+    animationQueue: [],
+    lastRotationClockwise: true
 };
 
 function renderFlowerDiagram() {
@@ -555,11 +556,32 @@ function updateFlowerDots() {
         newColors[dotId] = faceState[dotInfo.row][dotInfo.col];
     });
 
-    // Find dots that changed and animate them
-    animateFlowerTransition(previousColors, newColors);
+    // Queue the animation
+    const clockwise = flowerState.lastRotationClockwise;
+    flowerState.animationQueue.push({ previousColors, newColors, clockwise });
+
+    // Process queue if not already animating
+    if (!flowerState.isAnimating) {
+        processFlowerAnimationQueue();
+    }
 }
 
-function animateFlowerTransition(previousColors, newColors) {
+function processFlowerAnimationQueue() {
+    if (flowerState.animationQueue.length === 0) {
+        flowerState.isAnimating = false;
+        return;
+    }
+
+    flowerState.isAnimating = true;
+    const { previousColors, newColors, clockwise } = flowerState.animationQueue.shift();
+    flowerState.lastRotationClockwise = clockwise;
+
+    animateFlowerTransition(previousColors, newColors, function() {
+        processFlowerAnimationQueue();
+    });
+}
+
+function animateFlowerTransition(previousColors, newColors, onComplete) {
     const changedDots = [];
 
     Object.keys(newColors).forEach(dotId => {
@@ -573,25 +595,36 @@ function animateFlowerTransition(previousColors, newColors) {
         }
     });
 
-    if (changedDots.length === 0) return;
+    if (changedDots.length === 0) {
+        if (onComplete) onComplete();
+        return;
+    }
 
     const duration = 400;
+    let completedCount = 0;
 
     changedDots.forEach((dot) => {
         const dotInfo = dot.info;
 
-        if (!dotInfo) return;
+        if (!dotInfo) {
+            completedCount++;
+            if (completedCount >= changedDots.length && onComplete) onComplete();
+            return;
+        }
 
-        // Get circle center for arc animation
         const circleCenter = getCircleCenterForDot(dotInfo);
 
         if (circleCenter) {
-            animateDotAlongArc(dot.id, dotInfo, circleCenter, dot.newColor, duration);
+            animateDotAlongArc(dot.id, dotInfo, circleCenter, dot.newColor, duration, function() {
+                completedCount++;
+                if (completedCount >= changedDots.length && onComplete) onComplete();
+            });
         } else {
             d3.select('#' + dot.id).attr('fill', dot.newColor);
+            completedCount++;
+            if (completedCount >= changedDots.length && onComplete) onComplete();
         }
 
-        // Update stored color
         dotInfo.currentColor = dot.newColor;
     });
 }
@@ -616,9 +649,12 @@ function getCircleCenterForDot(dotInfo) {
     return flowerState.groupCenters[groupIdx];
 }
 
-function animateDotAlongArc(dotId, dotInfo, center, newColor, duration) {
+function animateDotAlongArc(dotId, dotInfo, center, newColor, duration, onComplete) {
     const element = d3.select('#' + dotId);
-    if (element.empty()) return;
+    if (element.empty()) {
+        if (onComplete) onComplete();
+        return;
+    }
 
     const startX = parseFloat(element.attr('cx'));
     const startY = parseFloat(element.attr('cy'));
@@ -648,6 +684,7 @@ function animateDotAlongArc(dotId, dotInfo, center, newColor, duration) {
 
         if (progress >= 1) {
             element.attr('cx', startX).attr('cy', startY);
+            if (onComplete) onComplete();
             return true;
         }
         return false;
