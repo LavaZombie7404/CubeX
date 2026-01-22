@@ -18,7 +18,7 @@
             <div class="viewer-panel" id="viewer">
                 <!-- Three.js canvas will be inserted here -->
             </div>
-            <div class="diagram-panel">
+            <div class="diagram-panel" id="diagram-panel">
                 <div class="diagram-header">
                     <h3>Diagram</h3>
                     <div class="view-switcher">
@@ -40,50 +40,84 @@
             </div>
 
             <div class="controls">
+                <div id="moves-section">
+                    <h3>Moves</h3>
+                    <div class="move-buttons" id="pyraminx-moves">
+                        <div class="move-row">
+                            <button class="move-btn" data-move="top" data-reverse="false">U</button>
+                            <button class="move-btn" data-move="top" data-reverse="true">U'</button>
+                        </div>
+                        <div class="move-row">
+                            <button class="move-btn" data-move="left" data-reverse="false">L</button>
+                            <button class="move-btn" data-move="left" data-reverse="true">L'</button>
+                            <button class="move-btn" data-move="right" data-reverse="false">R</button>
+                            <button class="move-btn" data-move="right" data-reverse="true">R'</button>
+                        </div>
+                        <div class="move-row">
+                            <button class="move-btn" data-move="back" data-reverse="false">B</button>
+                            <button class="move-btn" data-move="back" data-reverse="true">B'</button>
+                        </div>
+                    </div>
+                    <div class="move-buttons" id="cube-moves" style="display: none;">
+                        <div class="move-row">
+                            <button class="move-btn cube-btn" data-move="top" data-reverse="false">U</button>
+                            <button class="move-btn cube-btn" data-move="top" data-reverse="true">U'</button>
+                            <button class="move-btn cube-btn" data-move="bottom" data-reverse="false">D</button>
+                            <button class="move-btn cube-btn" data-move="bottom" data-reverse="true">D'</button>
+                        </div>
+                        <div class="move-row">
+                            <button class="move-btn cube-btn" data-move="right" data-reverse="false">R</button>
+                            <button class="move-btn cube-btn" data-move="right" data-reverse="true">R'</button>
+                            <button class="move-btn cube-btn" data-move="left" data-reverse="false">L</button>
+                            <button class="move-btn cube-btn" data-move="left" data-reverse="true">L'</button>
+                        </div>
+                        <div class="move-row">
+                            <button class="move-btn cube-btn" data-move="front" data-reverse="false">F</button>
+                            <button class="move-btn cube-btn" data-move="front" data-reverse="true">F'</button>
+                            <button class="move-btn cube-btn" data-move="back" data-reverse="false">B</button>
+                            <button class="move-btn cube-btn" data-move="back" data-reverse="true">B'</button>
+                        </div>
+                    </div>
+                    <div class="move-buttons" id="cuboid-moves" style="display: none;">
+                        <div id="tree-moves">
+                            <div class="move-row">
+                                <button class="move-btn cuboid-btn" data-move="top">U</button>
+                                <button class="move-btn cuboid-btn" data-move="middle">M</button>
+                                <button class="move-btn cuboid-btn" data-move="bottom">B</button>
+                            </div>
+                            <div class="move-row">
+                                <button class="move-btn cuboid-btn" data-move="left">V</button>
+                                <button class="move-btn cuboid-btn" data-move="right">C</button>
+                            </div>
+                        </div>
+                        <div id="block-moves" style="display: none;">
+                            <div class="move-row">
+                                <button class="move-btn cuboid-btn" data-move="top">U</button>
+                                <button class="move-btn cuboid-btn" data-move="bottom">D</button>
+                            </div>
+                            <div class="move-row">
+                                <button class="move-btn cuboid-btn" data-move="front">F</button>
+                                <button class="move-btn cuboid-btn" data-move="back">B</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <h3>Puzzle</h3>
                 <select id="puzzle-select">
                     <option value="pyraminx" selected>Pyraminx</option>
                     <option value="cube2">2x2 Cube</option>
                     <option value="cube3">3x3 Cube</option>
                     <option value="cube4">4x4 Cube</option>
+                    <option value="cuboid1x2x3">1x2x3 Cuboid</option>
                 </select>
 
-                <h3>Moves</h3>
-                <div class="move-buttons" id="pyraminx-moves">
-                    <div class="move-row">
-                        <button class="move-btn" data-move="top" data-reverse="false">U</button>
-                        <button class="move-btn" data-move="top" data-reverse="true">U'</button>
-                    </div>
-                    <div class="move-row">
-                        <button class="move-btn" data-move="left" data-reverse="false">L</button>
-                        <button class="move-btn" data-move="left" data-reverse="true">L'</button>
-                        <button class="move-btn" data-move="right" data-reverse="false">R</button>
-                        <button class="move-btn" data-move="right" data-reverse="true">R'</button>
-                    </div>
-                    <div class="move-row">
-                        <button class="move-btn" data-move="back" data-reverse="false">B</button>
-                        <button class="move-btn" data-move="back" data-reverse="true">B'</button>
-                    </div>
-                </div>
-                <div class="move-buttons" id="cube-moves" style="display: none;">
-                    <div class="move-row">
-                        <button class="move-btn cube-btn" data-move="top" data-reverse="false">U</button>
-                        <button class="move-btn cube-btn" data-move="top" data-reverse="true">U'</button>
-                        <button class="move-btn cube-btn" data-move="bottom" data-reverse="false">D</button>
-                        <button class="move-btn cube-btn" data-move="bottom" data-reverse="true">D'</button>
-                    </div>
-                    <div class="move-row">
-                        <button class="move-btn cube-btn" data-move="right" data-reverse="false">R</button>
-                        <button class="move-btn cube-btn" data-move="right" data-reverse="true">R'</button>
-                        <button class="move-btn cube-btn" data-move="left" data-reverse="false">L</button>
-                        <button class="move-btn cube-btn" data-move="left" data-reverse="true">L'</button>
-                    </div>
-                    <div class="move-row">
-                        <button class="move-btn cube-btn" data-move="front" data-reverse="false">F</button>
-                        <button class="move-btn cube-btn" data-move="front" data-reverse="true">F'</button>
-                        <button class="move-btn cube-btn" data-move="back" data-reverse="false">B</button>
-                        <button class="move-btn cube-btn" data-move="back" data-reverse="true">B'</button>
-                    </div>
+                <div id="figure-section" style="display: none;">
+                    <h3>Figure</h3>
+                    <select id="figure-select">
+                        <option value="block" selected>Block</option>
+                        <option value="tree">Tree</option>
+                    </select>
                 </div>
 
                 <h3>Instructions</h3>

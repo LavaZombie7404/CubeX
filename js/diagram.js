@@ -18,6 +18,14 @@ var diagramState = {
     faces: {}
 };
 
+function clearDiagram() {
+    const container = document.getElementById('cube-diagram');
+    if (container) {
+        container.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">No diagram for this puzzle</p>';
+    }
+    diagramState.puzzleType = 'none';
+}
+
 function initDiagram(size) {
     size = size || 3;
     diagramState.size = size;
@@ -81,7 +89,11 @@ function setupViewSwitcher() {
 }
 
 function renderCurrentView() {
-    if (diagramState.puzzleType === 'pyraminx') {
+    if (diagramState.puzzleType === 'none') {
+        // No diagram for this puzzle (e.g., cuboids)
+        clearDiagram();
+        return;
+    } else if (diagramState.puzzleType === 'pyraminx') {
         // Pyraminx only has circular view for now
         renderPyraminxDiagram();
     } else {

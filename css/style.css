@@ -261,6 +261,11 @@ body {
     margin-bottom: 4px;
 }
 
+/* Cuboid move buttons */
+.cuboid-btn {
+    width: 50px;
+}
+
 @media (max-width: 900px) {
     .container {
         flex-direction: column;
