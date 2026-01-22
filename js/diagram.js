@@ -719,7 +719,8 @@ function renderPyraminxFace(svg, faceName, cx, cy, size, rotation) {
         const rowWidth = triWidth * (row + 1);
 
         for (let col = 0; col < numTris; col++) {
-            const isDown = col % 2 === 0;
+            // Triangle orientation: tip (row 0) points UP, then alternates
+            const isDown = (row + col) % 2 === 1;
             const triCenterX = -rowWidth / 2 + triWidth * (col + 1) / 2;
 
             let points;
