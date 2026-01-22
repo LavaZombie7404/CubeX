@@ -5,14 +5,15 @@ const PYRAMINX_COLORS = {
     bottom: 0xf1c40f    // yellow
 };
 
-// Regular tetrahedron vertices (edge length = 1)
-// Centered at origin
+// Regular tetrahedron vertices (edge length = EDGE)
+// Centered at origin with one vertex pointing up
 const EDGE = 1.5;
+const H = EDGE * Math.sqrt(2/3);  // height of regular tetrahedron
 const VERTICES = {
-    top: new THREE.Vector3(0, EDGE * Math.sqrt(2/3), 0),
-    frontLeft: new THREE.Vector3(-EDGE/2, -EDGE * Math.sqrt(2/3) / 3, EDGE * Math.sqrt(3) / 6),
-    frontRight: new THREE.Vector3(EDGE/2, -EDGE * Math.sqrt(2/3) / 3, EDGE * Math.sqrt(3) / 6),
-    back: new THREE.Vector3(0, -EDGE * Math.sqrt(2/3) / 3, -EDGE * Math.sqrt(3) / 3)
+    top: new THREE.Vector3(0, H * 3/4, 0),
+    frontLeft: new THREE.Vector3(-EDGE/2, -H / 4, EDGE * Math.sqrt(3) / 6),
+    frontRight: new THREE.Vector3(EDGE/2, -H / 4, EDGE * Math.sqrt(3) / 6),
+    back: new THREE.Vector3(0, -H / 4, -EDGE * Math.sqrt(3) / 3)
 };
 
 // Center of tetrahedron
@@ -83,7 +84,7 @@ function createPyraminx() {
 
 function assignLayers(center) {
     const layers = [];
-    const threshold = EDGE * 0.4;
+    const threshold = EDGE * 0.25;
 
     if (center.distanceTo(VERTICES.top) < threshold) layers.push('top');
     if (center.distanceTo(VERTICES.frontLeft) < threshold) layers.push('left');
@@ -111,14 +112,14 @@ function subdivideFace(v0, v1, v2, divisions) {
             const bottomLeft = nextRowStart0.clone().lerp(nextRowStart1, tNext);
             const bottomRight = nextRowStart0.clone().lerp(nextRowStart1, tNextPlus);
 
-            // Pointing down triangle
-            triangles.push([top, bottomLeft, bottomRight]);
+            // Pointing down triangle (vertices ordered to match parent face winding)
+            triangles.push([top, bottomRight, bottomLeft]);
 
-            // Pointing up triangle (inverted)
+            // Pointing up triangle (inverted, same winding direction)
             if (col < row) {
                 const tPlusNext = (col + 1) / row;
                 const topRight = rowStart0.clone().lerp(rowStart1, tPlusNext);
-                triangles.push([bottomRight, topRight, top]);
+                triangles.push([bottomRight, top, topRight]);
             }
         }
     }
@@ -140,7 +141,7 @@ function createTriangleMesh(vertices, color) {
 
     const material = new THREE.MeshLambertMaterial({
         color: color,
-        side: THREE.FrontSide
+        side: THREE.DoubleSide
     });
 
     const mesh = new THREE.Mesh(geometry, material);
