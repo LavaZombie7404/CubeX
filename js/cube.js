@@ -106,7 +106,7 @@ function rotateCubeLayer(face, clockwise, onComplete) {
     // Adjust direction for certain faces
     const adjustedAngle = ['left', 'bottom', 'back'].includes(face) ? -angle : angle;
 
-    animateCubeRotation(layerCubies, axis, adjustedAngle, 300, function() {
+    animateCubeRotation(layerCubies, axis, adjustedAngle, 300, clockwise, function() {
         cubeState.isAnimating = false;
 
         if (onComplete) onComplete();
@@ -159,7 +159,7 @@ function getCubiesInLayer(face) {
     });
 }
 
-function animateCubeRotation(cubies, axis, targetAngle, duration, onComplete) {
+function animateCubeRotation(cubies, axis, targetAngle, duration, clockwise, onComplete) {
     const startTime = performance.now();
     const pivot = new THREE.Vector3(0, 0, 0);
 
@@ -204,9 +204,9 @@ function animateCubeRotation(cubies, axis, targetAngle, duration, onComplete) {
                 cubie.position.z = Math.round(cubie.position.z * 100) / 100;
             });
 
-            // Update 2D diagram
+            // Update 2D diagram with rotation direction
             if (typeof updateDiagramFromCube === 'function') {
-                updateDiagramFromCube();
+                updateDiagramFromCube(clockwise);
             }
 
             if (onComplete) onComplete();

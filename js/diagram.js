@@ -308,7 +308,11 @@ var flowerState = {
     dotElements: {},
     groupCenters: [],
     radii: [],
-    animating: false
+    svgSize: 450,
+    cx: 225,
+    cy: 225,
+    animating: false,
+    previousFaces: null  // Store previous state for animation
 };
 
 function renderFlowerDiagram() {
@@ -323,6 +327,12 @@ function renderFlowerDiagram() {
     const cx = svgSize / 2;
     const cy = svgSize / 2;
     const dotRadius = size === 2 ? 8 : 6;
+
+    // Store for animation calculations
+    flowerState.svgSize = svgSize;
+    flowerState.cx = cx;
+    flowerState.cy = cy;
+    flowerState.dotRadius = dotRadius;
 
     const svg = d3.select(container)
         .append('svg')
@@ -510,7 +520,10 @@ function drawFlowerDots(dotsGroup, faceConfigs, size, dotRadius) {
                     y: dot.y,
                     face: faceName,
                     row: row,
-                    col: col
+                    col: col,
+                    currentColor: dot.color,  // Store current color for animation
+                    circleGroup1: dot.circleGroup1,
+                    circleGroup2: dot.circleGroup2
                 };
             }
         }
@@ -519,31 +532,134 @@ function drawFlowerDots(dotsGroup, faceConfigs, size, dotRadius) {
 
 function updateFlowerDots() {
     if (!flowerState.dotElements || Object.keys(flowerState.dotElements).length === 0) {
-        // If no dots stored, re-render the whole diagram
         renderFlowerDiagram();
         return;
     }
 
+    // Get previous colors for comparison
+    const previousColors = {};
     Object.keys(flowerState.dotElements).forEach(dotId => {
         const dotInfo = flowerState.dotElements[dotId];
-        if (!dotInfo || !dotInfo.element) return;
+        if (dotInfo) {
+            previousColors[dotId] = dotInfo.currentColor;
+        }
+    });
 
+    // Calculate new colors
+    const newColors = {};
+    Object.keys(flowerState.dotElements).forEach(dotId => {
+        const dotInfo = flowerState.dotElements[dotId];
+        if (!dotInfo) return;
         const faceState = diagramState.faces[dotInfo.face];
         if (!faceState || !faceState[dotInfo.row]) return;
+        newColors[dotId] = faceState[dotInfo.row][dotInfo.col];
+    });
 
-        const newColor = faceState[dotInfo.row][dotInfo.col];
+    // Find dots that changed and animate them
+    animateFlowerTransition(previousColors, newColors);
+}
 
-        // Use D3 selection to update
-        d3.select('#' + dotId)
-            .transition()
-            .duration(200)
-            .attr('fill', newColor);
+function animateFlowerTransition(previousColors, newColors) {
+    const changedDots = [];
+
+    Object.keys(newColors).forEach(dotId => {
+        if (previousColors[dotId] !== newColors[dotId]) {
+            changedDots.push({
+                id: dotId,
+                oldColor: previousColors[dotId],
+                newColor: newColors[dotId],
+                info: flowerState.dotElements[dotId]
+            });
+        }
+    });
+
+    if (changedDots.length === 0) return;
+
+    const duration = 400;
+
+    changedDots.forEach((dot) => {
+        const dotInfo = dot.info;
+
+        if (!dotInfo) return;
+
+        // Get circle center for arc animation
+        const circleCenter = getCircleCenterForDot(dotInfo);
+
+        if (circleCenter) {
+            animateDotAlongArc(dot.id, dotInfo, circleCenter, dot.newColor, duration);
+        } else {
+            d3.select('#' + dot.id).attr('fill', dot.newColor);
+        }
+
+        // Update stored color
+        dotInfo.currentColor = dot.newColor;
+    });
+}
+
+function getCircleCenterForDot(dotInfo) {
+    // Each face is at intersection of two circle groups
+    // Return one of the circle centers for arc animation
+    if (!flowerState.groupCenters || flowerState.groupCenters.length < 3) return null;
+
+    const faceToGroups = {
+        'right': 0,   // Use group 0 (top)
+        'left': 0,
+        'front': 0,
+        'back': 0,
+        'top': 1,     // Use group 1 (bottom-left)
+        'bottom': 1
+    };
+
+    const groupIdx = faceToGroups[dotInfo.face];
+    if (groupIdx === undefined) return null;
+
+    return flowerState.groupCenters[groupIdx];
+}
+
+function animateDotAlongArc(dotId, dotInfo, center, newColor, duration) {
+    const element = d3.select('#' + dotId);
+    if (element.empty()) return;
+
+    const startX = parseFloat(element.attr('cx'));
+    const startY = parseFloat(element.attr('cy'));
+
+    const radius = Math.sqrt(
+        Math.pow(startX - center.x, 2) + Math.pow(startY - center.y, 2)
+    );
+    const startAngle = Math.atan2(startY - center.y, startX - center.x);
+
+    // Full circle in rotation direction
+    const clockwise = flowerState.lastRotationClockwise !== false;
+    const arcAngle = clockwise ? -Math.PI * 2 : Math.PI * 2;
+
+    d3.timer(function(elapsed) {
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Linear movement - no easing
+        const currentAngle = startAngle + arcAngle * progress;
+        element
+            .attr('cx', center.x + radius * Math.cos(currentAngle))
+            .attr('cy', center.y + radius * Math.sin(currentAngle));
+
+        // Change color at halfway point
+        if (progress >= 0.5) {
+            element.attr('fill', newColor);
+        }
+
+        if (progress >= 1) {
+            element.attr('cx', startX).attr('cy', startY);
+            return true;
+        }
+        return false;
     });
 }
 
 // ============ UPDATE FROM 3D CUBE ============
-function updateDiagramFromCube() {
+function updateDiagramFromCube(clockwise) {
     if (!cubeState.cubies || cubeState.cubies.length === 0) return;
+
+    // Store rotation direction for animation
+    flowerState.lastRotationClockwise = clockwise;
 
     const size = cubeState.size;
     diagramState.size = size;
@@ -594,8 +710,12 @@ function updateDiagramFromCube() {
         }
     });
 
-    // Always re-render the current view to ensure sync
-    renderCurrentView();
+    // For flower view, animate the transition; for others, re-render
+    if (diagramState.view === 'flower' && Object.keys(flowerState.dotElements).length > 0) {
+        updateFlowerDots();
+    } else {
+        renderCurrentView();
+    }
 }
 
 // Get the color of the face pointing in a world direction
