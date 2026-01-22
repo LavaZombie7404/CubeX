@@ -54,24 +54,47 @@ function createPyraminx() {
         { v: [VERTICES.frontLeft, VERTICES.frontRight, VERTICES.back], color: PYRAMINX_COLORS.bottom, name: 'bottom' }
     ];
 
+    // Map face vertex positions to layer names
+    const vertexToLayer = new Map([
+        [VERTICES.top, 'top'],
+        [VERTICES.frontLeft, 'left'],
+        [VERTICES.frontRight, 'right'],
+        [VERTICES.back, 'back']
+    ]);
+
     faces.forEach(face => {
         const triangles = subdivideFace(face.v[0], face.v[1], face.v[2], 3);
+        const v0Layer = vertexToLayer.get(face.v[0]);
 
         triangles.forEach((tri, index) => {
-            const mesh = createTriangleMesh(tri, face.color);
+            const mesh = createTriangleMesh(tri.verts, face.color);
 
             // Calculate center of triangle for layer assignment
             const center = new THREE.Vector3(
-                (tri[0].x + tri[1].x + tri[2].x) / 3,
-                (tri[0].y + tri[1].y + tri[2].y) / 3,
-                (tri[0].z + tri[1].z + tri[2].z) / 3
+                (tri.verts[0].x + tri.verts[1].x + tri.verts[2].x) / 3,
+                (tri.verts[0].y + tri.verts[1].y + tri.verts[2].y) / 3,
+                (tri.verts[0].z + tri.verts[1].z + tri.verts[2].z) / 3
             );
+
+            // Row-based layer assignment for the face's primary vertex (v0)
+            // Row 0 = tip only, Row 0-1 = wide layer (4 small tetrahedra)
+            const layers = [];
+            const wideLayers = [];
+
+            if (tri.row === 0) {
+                layers.push(v0Layer);
+            }
+            if (tri.row <= 1) {
+                wideLayers.push(v0Layer);
+            }
 
             mesh.userData = {
                 face: face.name,
                 index: index,
                 center: center,
-                layers: assignLayers(center)
+                row: tri.row,
+                layers: layers,
+                wideLayers: wideLayers
             };
 
             pyraminxState.pieces.push(mesh);
@@ -82,16 +105,47 @@ function createPyraminx() {
     return pyraminxState.group;
 }
 
+// Opposite face centers (center of the face opposite to each vertex)
+const OPPOSITE_FACE_CENTERS = {
+    top: new THREE.Vector3().addVectors(VERTICES.frontLeft, VERTICES.frontRight).add(VERTICES.back).divideScalar(3),
+    left: new THREE.Vector3().addVectors(VERTICES.top, VERTICES.frontRight).add(VERTICES.back).divideScalar(3),
+    right: new THREE.Vector3().addVectors(VERTICES.top, VERTICES.frontLeft).add(VERTICES.back).divideScalar(3),
+    back: new THREE.Vector3().addVectors(VERTICES.top, VERTICES.frontLeft).add(VERTICES.frontRight).divideScalar(3)
+};
+
 function assignLayers(center) {
     const layers = [];
-    const threshold = EDGE * 0.25;
+    const wideLayers = [];
+    const tipThreshold = EDGE * 0.25;   // tip only
 
-    if (center.distanceTo(VERTICES.top) < threshold) layers.push('top');
-    if (center.distanceTo(VERTICES.frontLeft) < threshold) layers.push('left');
-    if (center.distanceTo(VERTICES.frontRight) < threshold) layers.push('right');
-    if (center.distanceTo(VERTICES.back) < threshold) layers.push('back');
+    // Check each vertex
+    const vertexChecks = [
+        { vertex: VERTICES.top, opposite: OPPOSITE_FACE_CENTERS.top, name: 'top' },
+        { vertex: VERTICES.frontLeft, opposite: OPPOSITE_FACE_CENTERS.left, name: 'left' },
+        { vertex: VERTICES.frontRight, opposite: OPPOSITE_FACE_CENTERS.right, name: 'right' },
+        { vertex: VERTICES.back, opposite: OPPOSITE_FACE_CENTERS.back, name: 'back' }
+    ];
 
-    return layers;
+    vertexChecks.forEach(({ vertex, opposite, name }) => {
+        // Tip layer: simple distance check
+        if (center.distanceTo(vertex) < tipThreshold) {
+            layers.push(name);
+        }
+
+        // Wide layer: check if center is in the inner 2/3 from vertex toward opposite face
+        // Project center onto axis from vertex to opposite face center
+        const axisVec = opposite.clone().sub(vertex);
+        const centerVec = center.clone().sub(vertex);
+        const projection = centerVec.dot(axisVec) / axisVec.lengthSq();
+
+        // projection = 0 at vertex, 1 at opposite face center
+        // Wide layer includes rows 0-1 out of 3, so projection < 2/3
+        if (projection < 2/3) {
+            wideLayers.push(name);
+        }
+    });
+
+    return { layers, wideLayers };
 }
 
 function subdivideFace(v0, v1, v2, divisions) {
@@ -113,13 +167,15 @@ function subdivideFace(v0, v1, v2, divisions) {
             const bottomRight = nextRowStart0.clone().lerp(nextRowStart1, tNextPlus);
 
             // Pointing down triangle (vertices ordered to match parent face winding)
-            triangles.push([top, bottomRight, bottomLeft]);
+            // row 0 = tip, row 1 = adjacent to tip
+            triangles.push({ verts: [top, bottomRight, bottomLeft], row: row });
 
             // Pointing up triangle (inverted, same winding direction)
             if (col < row) {
                 const tPlusNext = (col + 1) / row;
                 const topRight = rowStart0.clone().lerp(rowStart1, tPlusNext);
-                triangles.push([bottomRight, top, topRight]);
+                // Up-pointing triangles in row N are still part of row N
+                triangles.push({ verts: [bottomRight, top, topRight], row: row });
             }
         }
     }
@@ -156,9 +212,9 @@ function createTriangleMesh(vertices, color) {
     return mesh;
 }
 
-function rotatePyraminxLayer(layerName, clockwise, onComplete) {
+function rotatePyraminxLayer(layerName, clockwise, wide, onComplete) {
     if (pyraminxState.isAnimating) {
-        pyraminxState.animationQueue.push({ layerName, clockwise, onComplete });
+        pyraminxState.animationQueue.push({ layerName, clockwise, wide, onComplete });
         return;
     }
 
@@ -166,8 +222,9 @@ function rotatePyraminxLayer(layerName, clockwise, onComplete) {
     const pivot = PIVOTS[layerName];
     const angle = clockwise ? -2 * Math.PI / 3 : 2 * Math.PI / 3;
 
+    const layerKey = wide ? 'wideLayers' : 'layers';
     const layerPieces = pyraminxState.pieces.filter(p =>
-        p.userData.layers.includes(layerName)
+        p.userData[layerKey].includes(layerName)
     );
 
     if (layerPieces.length === 0) return;
@@ -181,7 +238,7 @@ function rotatePyraminxLayer(layerName, clockwise, onComplete) {
 
         if (pyraminxState.animationQueue.length > 0) {
             const next = pyraminxState.animationQueue.shift();
-            rotatePyraminxLayer(next.layerName, next.clockwise, next.onComplete);
+            rotatePyraminxLayer(next.layerName, next.clockwise, next.wide, next.onComplete);
         }
     });
 }
@@ -243,7 +300,9 @@ function animateRotation(pieces, pivot, axis, targetAngle, duration, onComplete)
                     (posAttr.getZ(0) + posAttr.getZ(1) + posAttr.getZ(2)) / 3
                 );
                 piece.userData.center = center;
-                piece.userData.layers = assignLayers(center);
+                const layerAssignment = assignLayers(center);
+                piece.userData.layers = layerAssignment.layers;
+                piece.userData.wideLayers = layerAssignment.wideLayers;
             });
 
             if (onComplete) onComplete();
@@ -259,19 +318,25 @@ function setupPyraminxControls() {
 
         const key = e.key.toLowerCase();
         const shift = e.shiftKey;
+        const ctrl = e.ctrlKey;
+        const clockwise = !shift;
 
         switch(key) {
             case 'u':
-                rotatePyraminxLayer('top', !shift);
+                e.preventDefault();
+                rotatePyraminxLayer('top', clockwise, ctrl);
                 break;
             case 'l':
-                rotatePyraminxLayer('left', !shift);
+                e.preventDefault();
+                rotatePyraminxLayer('left', clockwise, ctrl);
                 break;
             case 'r':
-                rotatePyraminxLayer('right', !shift);
+                e.preventDefault();
+                rotatePyraminxLayer('right', clockwise, ctrl);
                 break;
             case 'b':
-                rotatePyraminxLayer('back', !shift);
+                e.preventDefault();
+                rotatePyraminxLayer('back', clockwise, ctrl);
                 break;
         }
     });

@@ -4,8 +4,13 @@
     box-sizing: border-box;
 }
 
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
 :root {
-    --header-height: 60px;
+    --header-height: 50px;
     --bg-dark: #1a1a2e;
     --bg-panel: #16213e;
     --accent: #e94560;
@@ -17,7 +22,6 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     background: var(--bg-dark);
     color: var(--text);
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
@@ -30,44 +34,127 @@ body {
     padding: 0 20px;
     gap: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
 }
 
 .header h1 {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     color: var(--accent);
 }
 
 .header p {
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
 }
 
 .container {
     flex: 1;
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    height: calc(100vh - var(--header-height));
+    display: flex;
+    min-height: 0;
+}
+
+/* Left panel - 3D viewer and diagram */
+.left-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 0;
 }
 
 .viewer-panel {
+    flex: 55;
     background: var(--bg-dark);
     position: relative;
     overflow: hidden;
+    min-height: 0;
 }
 
 .viewer-panel canvas {
     display: block;
 }
 
+.diagram-panel {
+    flex: 45;
+    background: var(--bg-panel);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 10px 15px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.diagram-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+}
+
+.diagram-header h3 {
+    color: var(--accent);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0;
+}
+
+.view-switcher {
+    display: flex;
+    gap: 5px;
+}
+
+.view-btn {
+    padding: 4px 8px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-muted);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.view-btn:hover {
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+.view-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+#cube-diagram {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#cube-diagram svg {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Right panel - controls */
 .control-panel {
+    flex: 1;
     background: var(--bg-panel);
     display: flex;
     flex-direction: column;
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .camera-feed {
-    height: 300px;
+    flex: 0 0 200px;
     background: #0f0f23;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -82,23 +169,24 @@ body {
 }
 
 .camera-feed .placeholder p {
-    font-size: 1.2rem;
+    font-size: 1rem;
     margin-bottom: 5px;
 }
 
 .controls {
     flex: 1;
-    padding: 20px;
+    padding: 15px;
     overflow-y: auto;
+    min-height: 0;
 }
 
 .controls h3 {
     color: var(--accent);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-bottom: 10px;
-    margin-top: 20px;
+    margin-bottom: 8px;
+    margin-top: 15px;
 }
 
 .controls h3:first-child {
@@ -107,12 +195,12 @@ body {
 
 .controls select {
     width: 100%;
-    padding: 10px;
+    padding: 8px;
     background: var(--bg-dark);
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: var(--text);
     border-radius: 4px;
-    font-size: 1rem;
+    font-size: 0.9rem;
 }
 
 .controls select:focus {
@@ -123,24 +211,24 @@ body {
 .move-buttons {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 15px;
+    gap: 6px;
+    margin-bottom: 10px;
 }
 
 .move-row {
     display: flex;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .move-btn {
-    width: 50px;
-    height: 40px;
+    width: 42px;
+    height: 34px;
     background: var(--bg-dark);
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: var(--text);
     border-radius: 4px;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.2s;
@@ -158,33 +246,42 @@ body {
 .instructions,
 .hints {
     background: var(--bg-dark);
-    padding: 15px;
+    padding: 12px;
     border-radius: 4px;
-    font-size: 0.9rem;
-    line-height: 1.6;
+    font-size: 0.8rem;
+    line-height: 1.5;
 }
 
 .instructions ul {
-    margin-left: 20px;
-    margin-top: 10px;
+    margin-left: 18px;
+    margin-top: 8px;
 }
 
 .instructions li {
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
 
 @media (max-width: 900px) {
     .container {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr auto;
+        flex-direction: column;
+    }
+
+    .left-panel {
+        flex: 1;
+        border-right: none;
     }
 
     .control-panel {
-        border-left: none;
+        flex: 0 0 auto;
+        max-height: 50%;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .camera-feed {
-        height: 200px;
+        display: none;
+    }
+
+    .diagram-panel {
+        flex: 0 0 150px;
     }
 }

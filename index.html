@@ -13,10 +13,25 @@
     </header>
 
     <main class="container">
-        <section class="viewer-panel" id="viewer">
-            <!-- Three.js canvas will be inserted here -->
+        <!-- Left Panel: 3D Viewer + Diagram -->
+        <section class="left-panel">
+            <div class="viewer-panel" id="viewer">
+                <!-- Three.js canvas will be inserted here -->
+            </div>
+            <div class="diagram-panel">
+                <div class="diagram-header">
+                    <h3>Diagram</h3>
+                    <div class="view-switcher">
+                        <button class="view-btn active" data-view="net">Net</button>
+                        <button class="view-btn" data-view="circular">Circular</button>
+                        <button class="view-btn" data-view="flower">Flower</button>
+                    </div>
+                </div>
+                <div id="cube-diagram"></div>
+            </div>
         </section>
 
+        <!-- Right Panel: Controls -->
         <aside class="control-panel">
             <div class="camera-feed" id="camera-feed">
                 <div class="placeholder">
@@ -29,11 +44,12 @@
                 <h3>Puzzle</h3>
                 <select id="puzzle-select">
                     <option value="pyraminx" selected>Pyraminx</option>
-                    <option value="cube" disabled>Rubik's Cube (coming soon)</option>
+                    <option value="cube2">2x2 Cube</option>
+                    <option value="cube3">3x3 Cube</option>
                 </select>
 
                 <h3>Moves</h3>
-                <div class="move-buttons">
+                <div class="move-buttons" id="pyraminx-moves">
                     <div class="move-row">
                         <button class="move-btn" data-move="top" data-reverse="false">U</button>
                         <button class="move-btn" data-move="top" data-reverse="true">U'</button>
@@ -47,6 +63,26 @@
                     <div class="move-row">
                         <button class="move-btn" data-move="back" data-reverse="false">B</button>
                         <button class="move-btn" data-move="back" data-reverse="true">B'</button>
+                    </div>
+                </div>
+                <div class="move-buttons" id="cube-moves" style="display: none;">
+                    <div class="move-row">
+                        <button class="move-btn cube-btn" data-move="top" data-reverse="false">U</button>
+                        <button class="move-btn cube-btn" data-move="top" data-reverse="true">U'</button>
+                        <button class="move-btn cube-btn" data-move="bottom" data-reverse="false">D</button>
+                        <button class="move-btn cube-btn" data-move="bottom" data-reverse="true">D'</button>
+                    </div>
+                    <div class="move-row">
+                        <button class="move-btn cube-btn" data-move="right" data-reverse="false">R</button>
+                        <button class="move-btn cube-btn" data-move="right" data-reverse="true">R'</button>
+                        <button class="move-btn cube-btn" data-move="left" data-reverse="false">L</button>
+                        <button class="move-btn cube-btn" data-move="left" data-reverse="true">L'</button>
+                    </div>
+                    <div class="move-row">
+                        <button class="move-btn cube-btn" data-move="front" data-reverse="false">F</button>
+                        <button class="move-btn cube-btn" data-move="front" data-reverse="true">F'</button>
+                        <button class="move-btn cube-btn" data-move="back" data-reverse="false">B</button>
+                        <button class="move-btn cube-btn" data-move="back" data-reverse="true">B'</button>
                     </div>
                 </div>
 
@@ -71,7 +107,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="js/pyraminx.js"></script>
+    <script src="js/cube.js"></script>
+    <script src="js/diagram.js"></script>
     <script src="js/scene.js"></script>
     <script src="js/main.js"></script>
 </body>
