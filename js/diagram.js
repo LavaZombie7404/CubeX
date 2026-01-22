@@ -1,10 +1,11 @@
-// Cube diagram using D3.js - supports net and circular views
+// Diagram system - supports cube and pyraminx with net and circular views
 var diagramState = {
     svg: null,
     size: 3,
     cellSize: 25,
     gap: 2,
     view: 'net',
+    puzzleType: 'cube',  // 'cube' or 'pyraminx'
     initialized: false,
     colors: {
         top: '#ffffff',
@@ -21,6 +22,7 @@ function initDiagram(size) {
     size = size || 3;
     diagramState.size = size;
     diagramState.cellSize = size === 2 ? 35 : 25;
+    diagramState.puzzleType = 'cube';
 
     // Initialize face states with solved colors
     diagramState.faces = {
@@ -79,10 +81,16 @@ function setupViewSwitcher() {
 }
 
 function renderCurrentView() {
-    if (diagramState.view === 'net') {
-        renderNetDiagram();
-    } else if (diagramState.view === 'circular') {
-        renderCircularDiagram();
+    if (diagramState.puzzleType === 'pyraminx') {
+        // Pyraminx only has circular view for now
+        renderPyraminxDiagram();
+    } else {
+        // Cube views
+        if (diagramState.view === 'net') {
+            renderNetDiagram();
+        } else if (diagramState.view === 'circular') {
+            renderCircularDiagram();
+        }
     }
 }
 
@@ -624,6 +632,8 @@ var pyraminxDiagramState = {
 };
 
 function initPyraminxDiagram() {
+    diagramState.puzzleType = 'pyraminx';
+
     // Initialize face states with solved colors (9 stickers per face)
     pyraminxDiagramState.faces = {
         front: Array(9).fill(pyraminxDiagramState.colors.front),
@@ -631,6 +641,12 @@ function initPyraminxDiagram() {
         left: Array(9).fill(pyraminxDiagramState.colors.left),
         bottom: Array(9).fill(pyraminxDiagramState.colors.bottom)
     };
+
+    // Setup view switcher only once
+    if (!diagramState.initialized) {
+        setupViewSwitcher();
+        diagramState.initialized = true;
+    }
 
     renderPyraminxDiagram();
 }
