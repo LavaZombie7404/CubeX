@@ -1,4 +1,4 @@
-var currentPuzzle = 'pyraminx';
+var currentPuzzle = 'cube3';
 var sceneRef = null;
 var currentPuzzleGroup = null;
 var currentFigure = 'block';
@@ -8,8 +8,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const { scene, camera, renderer, controls } = initScene(viewerElement);
     sceneRef = scene;
 
-    // Create initial puzzle (pyraminx)
-    currentPuzzleGroup = createPyraminx();
+    // Create initial puzzle (3x3 cube)
+    currentPuzzleGroup = createCube(3);
     scene.add(currentPuzzleGroup);
 
     setupPyraminxControls();
@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupFigureSelector();
 
     // Initialize diagram for default puzzle
-    initPyraminxDiagram();
+    initDiagram(3);
 
     animate(renderer, scene, camera, controls);
 

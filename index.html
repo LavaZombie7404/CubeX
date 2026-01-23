@@ -42,7 +42,7 @@
             <div class="controls">
                 <div id="moves-section">
                     <h3>Moves</h3>
-                    <div class="move-buttons" id="pyraminx-moves">
+                    <div class="move-buttons" id="pyraminx-moves" style="display: none;">
                         <div class="move-row">
                             <button class="move-btn" data-move="top" data-reverse="false">U</button>
                             <button class="move-btn" data-move="top" data-reverse="true">U'</button>
@@ -58,7 +58,7 @@
                             <button class="move-btn" data-move="back" data-reverse="true">B'</button>
                         </div>
                     </div>
-                    <div class="move-buttons" id="cube-moves" style="display: none;">
+                    <div class="move-buttons" id="cube-moves">
                         <div class="move-row">
                             <button class="move-btn cube-btn" data-move="top" data-reverse="false">U</button>
                             <button class="move-btn cube-btn" data-move="top" data-reverse="true">U'</button>
@@ -105,9 +105,9 @@
 
                 <h3>Puzzle</h3>
                 <select id="puzzle-select">
-                    <option value="pyraminx" selected>Pyraminx</option>
+                    <option value="pyraminx">Pyraminx</option>
                     <option value="cube2">2x2 Cube</option>
-                    <option value="cube3">3x3 Cube</option>
+                    <option value="cube3" selected>3x3 Cube</option>
                     <option value="cube4">4x4 Cube</option>
                     <option value="cuboid1x2x3">1x2x3 Cuboid</option>
                 </select>
