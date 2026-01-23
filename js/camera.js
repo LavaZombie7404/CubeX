@@ -97,7 +97,7 @@ async function startCamera() {
                 facingMode: 'environment',
                 width: { ideal: 320, max: 640 },
                 height: { ideal: 240, max: 480 },
-                frameRate: { ideal: 4, max: 10 }
+                frameRate: { ideal: 30, max: 30 }
             },
             audio: false
         };
