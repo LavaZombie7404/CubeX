@@ -1,10 +1,10 @@
 const CUBE_COLORS = {
-    top: 0xffffff,      // white
-    bottom: 0xffff00,   // yellow
-    front: 0xff0000,    // red
-    back: 0xffa500,     // orange
-    right: 0x0000ff,    // blue
-    left: 0x00ff00      // green
+    top: 0xffff00,      // yellow
+    bottom: 0x0000ff,   // blue
+    front: 0xffffff,    // white
+    back: 0x00ff00,     // green
+    right: 0xff0000,    // red
+    left: 0xffa500      // orange
 };
 
 const CUBIE_SIZE = 0.45;
@@ -379,35 +379,33 @@ function createTreeWedge(row, side, gridY, gridZ, thinDepth) {
 }
 
 function getTreeFaceColors(row, side) {
-    // Colors for each face of the wedge pieces
-    const white = 0xffffff;
-    const yellow = 0xffff00;
-    const red = 0xff0000;
-    const orange = 0xffa500;
-    const blue = 0x0000ff;
-    const green = 0x00ff00;
+    // Colors for each face of the wedge pieces (matching CUBE_COLORS)
+    const front = CUBE_COLORS.front;   // white
+    const back = CUBE_COLORS.back;     // green
+    const bottom = CUBE_COLORS.bottom; // blue
+    const top = CUBE_COLORS.top;       // yellow
     const brown = 0x8B4513;
 
-    const slantColor = side === 'left' ? orange : red;
+    const slantColor = side === 'left' ? CUBE_COLORS.left : CUBE_COLORS.right;
     const innerColor = 0x111111;  // dark for inner faces
 
     if (row === 'top') {
         // Prism: front(2), back(2), bottom(2), top(2), slant(2), inner(2)
         return [
-            white, white,           // front
-            yellow, yellow,         // back
-            green, green,           // bottom
-            blue, blue,             // top
+            front, front,           // front
+            back, back,             // back
+            bottom, bottom,         // bottom
+            top, top,               // top
             slantColor, slantColor, // outer slant
             innerColor, innerColor  // inner face
         ];
     } else if (row === 'bottom') {
         // Trapezoid + trunk: front(2), back(2), bottom(2), top(2), slant(2), inner(2), trunk faces(8)
         return [
-            white, white,           // front
-            yellow, yellow,         // back
-            green, green,           // bottom (hidden by trunk)
-            blue, blue,             // top
+            front, front,           // front
+            back, back,             // back
+            bottom, bottom,         // bottom (hidden by trunk)
+            top, top,               // top
             slantColor, slantColor, // outer slant
             innerColor, innerColor, // inner face
             brown, brown,           // trunk front
@@ -418,10 +416,10 @@ function getTreeFaceColors(row, side) {
     } else {
         // Middle: front(2), back(2), bottom(2), top(2), slant(2), inner(2)
         return [
-            white, white,           // front
-            yellow, yellow,         // back
-            green, green,           // bottom
-            blue, blue,             // top
+            front, front,           // front
+            back, back,             // back
+            bottom, bottom,         // bottom
+            top, top,               // top
             slantColor, slantColor, // outer slant
             innerColor, innerColor  // inner face
         ];

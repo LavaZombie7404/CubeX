@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize diagram for default puzzle
     initDiagram(3);
 
+    // Initialize camera module
+    initCamera();
+
     animate(renderer, scene, camera, controls);
 
     window.addEventListener('resize', function() {
@@ -31,6 +34,12 @@ document.addEventListener('DOMContentLoaded', function() {
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
         renderer.setSize(width, height);
+
+        handleCameraResize();
+    });
+
+    window.addEventListener('beforeunload', function() {
+        cleanupCamera();
     });
 });
 
@@ -111,6 +120,9 @@ function setupPuzzleSelector() {
 
         sceneRef.add(currentPuzzleGroup);
         currentPuzzle = puzzle;
+
+        // Update camera overlay guide for new puzzle
+        updateCameraGuide();
     });
 }
 

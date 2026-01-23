@@ -33,10 +33,20 @@
         <!-- Right Panel: Controls -->
         <aside class="control-panel">
             <div class="camera-feed" id="camera-feed">
-                <div class="placeholder">
+                <video id="camera-video" autoplay playsinline muted></video>
+                <canvas id="camera-canvas"></canvas>
+                <svg id="camera-overlay" class="camera-overlay"></svg>
+                <div class="camera-placeholder" id="camera-placeholder">
                     <p>Camera Feed</p>
-                    <small>Color detection coming soon</small>
+                    <small>Click to enable camera</small>
                 </div>
+                <div class="camera-controls" id="camera-controls">
+                    <button class="camera-btn" id="camera-toggle" title="Toggle Camera">OFF</button>
+                    <button class="camera-btn" id="camera-snapshot" title="Capture" disabled>SNAP</button>
+                    <button class="camera-btn" id="camera-detect" title="Detect Colors" disabled>DETECT</button>
+                </div>
+                <div class="camera-status" id="camera-status"></div>
+                <div class="camera-error" id="camera-error"></div>
             </div>
 
             <div class="controls">
@@ -146,6 +156,7 @@
     <script src="js/cube.js"></script>
     <script src="js/diagram.js"></script>
     <script src="js/scene.js"></script>
+    <script src="js/camera.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

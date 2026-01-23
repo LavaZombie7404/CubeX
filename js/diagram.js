@@ -8,12 +8,12 @@ var diagramState = {
     puzzleType: 'cube',  // 'cube' or 'pyraminx'
     initialized: false,
     colors: {
-        top: '#ffffff',
-        bottom: '#ffff00',
-        front: '#ff0000',
-        back: '#ffa500',
-        right: '#0000ff',
-        left: '#00ff00'
+        top: '#ffff00',
+        bottom: '#0000ff',
+        front: '#ffffff',
+        back: '#00ff00',
+        right: '#ff0000',
+        left: '#ffa500'
     },
     faces: {}
 };
