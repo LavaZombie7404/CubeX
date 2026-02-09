@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupPuzzleSelector();
     setupCuboidButtons();
     setupFigureSelector();
+    setupFloppyFigureSelector();
     setupScrambleButton();
 
     // Initialize diagram for default puzzle
@@ -53,6 +54,10 @@ function setupPuzzleSelector() {
     const diagramPanel = document.getElementById('diagram-panel');
     const figureSection = document.getElementById('figure-section');
     const figureSelect = document.getElementById('figure-select');
+    const floppyFigureSection = document.getElementById('floppy-figure-section');
+    const floppyFigureSelect = document.getElementById('floppy-figure-select');
+    const mirrorColorSection = document.getElementById('mirror-color-section');
+    const mirrorColorSelect = document.getElementById('mirror-color-select');
 
     selector.addEventListener('change', function() {
         const puzzle = this.value;
@@ -82,6 +87,8 @@ function setupPuzzleSelector() {
             floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
+            floppyFigureSection.style.display = 'none';
+            mirrorColorSection.style.display = 'none';
             initPyraminxDiagram();
         } else if (puzzle === 'cube2') {
             currentPuzzleGroup = createCube(2);
@@ -91,6 +98,8 @@ function setupPuzzleSelector() {
             floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
+            floppyFigureSection.style.display = 'none';
+            mirrorColorSection.style.display = 'none';
             initDiagram(2);
         } else if (puzzle === 'cube3') {
             currentPuzzleGroup = createCube(3);
@@ -100,6 +109,8 @@ function setupPuzzleSelector() {
             floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
+            floppyFigureSection.style.display = 'none';
+            mirrorColorSection.style.display = 'none';
             initDiagram(3);
         } else if (puzzle === 'cube4') {
             currentPuzzleGroup = createCube(4);
@@ -109,15 +120,21 @@ function setupPuzzleSelector() {
             floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
+            floppyFigureSection.style.display = 'none';
+            mirrorColorSection.style.display = 'none';
             initDiagram(4);
         } else if (puzzle === 'floppy') {
-            currentPuzzleGroup = createFloppyCube();
+            const floppyFigure = floppyFigureSelect.value;
+            const mirrorColor = mirrorColorSelect.value;
+            currentPuzzleGroup = createFloppyCube(floppyFigure, mirrorColor);
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'flex';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
+            floppyFigureSection.style.display = 'block';
+            mirrorColorSection.style.display = floppyFigure === 'mirror' ? 'block' : 'none';
             clearDiagram();
         } else if (puzzle === 'cuboid1x2x3') {
             currentFigure = figureSelect.value;
@@ -128,6 +145,8 @@ function setupPuzzleSelector() {
             floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'block';
+            floppyFigureSection.style.display = 'none';
+            mirrorColorSection.style.display = 'none';
             // Show correct move buttons for current figure
             updateCuboidMoveButtons(currentFigure);
             // Clear diagram for cuboid (no diagram yet)
@@ -193,6 +212,51 @@ function setupFigureSelector() {
         // Transform to figure
         transformToFigure(figure);
         currentFigure = figure;
+    });
+}
+
+function setupFloppyFigureSelector() {
+    const floppyFigureSelect = document.getElementById('floppy-figure-select');
+    const mirrorColorSelect = document.getElementById('mirror-color-select');
+    const mirrorColorSection = document.getElementById('mirror-color-section');
+
+    floppyFigureSelect.addEventListener('change', function() {
+        const figure = this.value;
+        const color = mirrorColorSelect.value;
+
+        // Show/hide color selector
+        mirrorColorSection.style.display = figure === 'mirror' ? 'block' : 'none';
+
+        // Recreate floppy cube with new figure
+        if (currentPuzzleGroup) {
+            sceneRef.remove(currentPuzzleGroup);
+        }
+        cubeState.group = null;
+        cubeState.cubies = [];
+        cubeState.isAnimating = false;
+        cubeState.animationQueue = [];
+
+        currentPuzzleGroup = createFloppyCube(figure, color);
+        sceneRef.add(currentPuzzleGroup);
+    });
+
+    mirrorColorSelect.addEventListener('change', function() {
+        const figure = floppyFigureSelect.value;
+        const color = this.value;
+
+        if (figure !== 'mirror') return;
+
+        // Recreate mirror cube with new color
+        if (currentPuzzleGroup) {
+            sceneRef.remove(currentPuzzleGroup);
+        }
+        cubeState.group = null;
+        cubeState.cubies = [];
+        cubeState.isAnimating = false;
+        cubeState.animationQueue = [];
+
+        currentPuzzleGroup = createFloppyCube(figure, color);
+        sceneRef.add(currentPuzzleGroup);
     });
 }
 

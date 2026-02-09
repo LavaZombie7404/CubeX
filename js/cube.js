@@ -55,7 +55,17 @@ function createCube(size) {
     return cubeState.group;
 }
 
-function createFloppyCube() {
+const MIRROR_COLORS = {
+    red: 0xe94560,
+    green: 0x4ecca3,
+    blue: 0x3498db,
+    yellow: 0xf1c40f
+};
+
+function createFloppyCube(figure, color) {
+    figure = figure || 'block';
+    color = color || 'red';
+
     // 1x3x3 floppy cube - flat 3x3 grid
     const sizeX = 1, sizeY = 3, sizeZ = 3;
     cubeState.size = 3;
@@ -63,14 +73,21 @@ function createFloppyCube() {
     cubeState.sizeY = sizeY;
     cubeState.sizeZ = sizeZ;
     cubeState.isCuboid = true;
-    cubeState.figure = 'floppy';
+    cubeState.figure = figure === 'mirror' ? 'mirror' : 'floppy';
     cubeState.group = new THREE.Group();
     cubeState.cubies = [];
 
     for (let x = 0; x < sizeX; x++) {
         for (let y = 0; y < sizeY; y++) {
             for (let z = 0; z < sizeZ; z++) {
-                const cubie = createCubie(x, y, z, sizeX, sizeY, sizeZ);
+                let cubie;
+
+                if (figure === 'mirror') {
+                    cubie = createMirrorPiece(y, z, color);
+                } else {
+                    cubie = createCubie(x, y, z, sizeX, sizeY, sizeZ);
+                }
+
                 const posX = (x - (sizeX - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
                 const posY = (y - (sizeY - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
                 const posZ = (z - (sizeZ - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
@@ -88,6 +105,46 @@ function createFloppyCube() {
     }
 
     return cubeState.group;
+}
+
+function createMirrorPiece(y, z, color) {
+    const mirrorColor = MIRROR_COLORS[color] || MIRROR_COLORS.red;
+
+    // Each piece has unique size - all form a square when solved
+    const sizes = {
+        // Corners - each different size
+        '0,0': { h: 0.75, w: 0.75 },   // tiny corner
+        '0,2': { h: 0.7, w: 0.7 },     // small corner
+        '2,0': { h: 0.81, w: 0.81 },   // normal corner
+        '2,2': { h: 0.55, w: 0.55 },   // big corner
+        // Edges - each different size
+        '0,1': { h: 0.75, w: 1.25 },   // tiny edge
+        '2,1': { h: 0.725, w: 0.725 }, // moving edge
+        '1,0': { h: 1.25, w: 0.75 },   // normal edge
+        '1,2': { h: 0.725, w: 0.725 }, // moving edge
+        // Center
+        '1,1': { h: 1.25, w: 1.25 }    // center piece
+    };
+
+    const key = `${y},${z}`;
+    const size = sizes[key] || { h: 1.0, w: 1.0 };
+
+    const geometry = new THREE.BoxGeometry(
+        CUBIE_SIZE * 2,
+        CUBIE_SIZE * 2 * size.h,
+        CUBIE_SIZE * 2 * size.w
+    );
+
+    const material = new THREE.MeshLambertMaterial({ color: mirrorColor });
+    const cubie = new THREE.Mesh(geometry, material);
+
+    // Add black edges
+    const edgesGeometry = new THREE.EdgesGeometry(geometry);
+    const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+    const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+    cubie.add(edges);
+
+    return cubie;
 }
 
 // Figure layouts for 1x2x3 cuboid (6 cubies)
@@ -572,8 +629,8 @@ function rotateCubeLayer(face, clockwise, onComplete) {
     if (cubeState.figure === 'tree') {
         // Tree always uses 180° rotations
         faceIsSquare = false;
-    } else if (cubeState.figure === 'floppy') {
-        // Floppy uses 180° rotations
+    } else if (cubeState.figure === 'floppy' || cubeState.figure === 'mirror') {
+        // Floppy and mirror use 180° rotations
         faceIsSquare = false;
     } else if (cubeState.isCuboid) {
         if (face === 'right' || face === 'left') {
