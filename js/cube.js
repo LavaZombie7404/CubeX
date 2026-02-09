@@ -792,3 +792,38 @@ function setupCubeControls() {
         }
     });
 }
+
+function scrambleCube(moveCount, onComplete) {
+    const faces = ['top', 'bottom', 'right', 'left', 'front', 'back'];
+    const moves = [];
+    let lastFace = null;
+
+    // Scale move count based on cube size
+    const size = cubeState.sizeX || 3;
+    moveCount = moveCount || (size * size * 3);
+
+    for (let i = 0; i < moveCount; i++) {
+        // Avoid same face twice in a row
+        let face;
+        do {
+            face = faces[Math.floor(Math.random() * faces.length)];
+        } while (face === lastFace);
+        lastFace = face;
+
+        const clockwise = Math.random() < 0.5;
+        moves.push({ face, clockwise });
+    }
+
+    // Execute moves sequentially
+    let index = 0;
+    function executeNext() {
+        if (index >= moves.length) {
+            if (onComplete) onComplete();
+            return;
+        }
+        const move = moves[index++];
+        rotateCubeLayer(move.face, move.clockwise, executeNext);
+    }
+
+    executeNext();
+}

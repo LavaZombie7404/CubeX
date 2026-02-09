@@ -54,17 +54,8 @@ function createPyraminx() {
         { v: [VERTICES.frontLeft, VERTICES.frontRight, VERTICES.back], color: PYRAMINX_COLORS.bottom, name: 'bottom' }
     ];
 
-    // Map face vertex positions to layer names
-    const vertexToLayer = new Map([
-        [VERTICES.top, 'top'],
-        [VERTICES.frontLeft, 'left'],
-        [VERTICES.frontRight, 'right'],
-        [VERTICES.back, 'back']
-    ]);
-
     faces.forEach(face => {
         const triangles = subdivideFace(face.v[0], face.v[1], face.v[2], 3);
-        const v0Layer = vertexToLayer.get(face.v[0]);
 
         triangles.forEach((tri, index) => {
             const mesh = createTriangleMesh(tri.verts, face.color);
@@ -76,25 +67,16 @@ function createPyraminx() {
                 (tri.verts[0].z + tri.verts[1].z + tri.verts[2].z) / 3
             );
 
-            // Row-based layer assignment for the face's primary vertex (v0)
-            // Row 0 = tip only, Row 0-1 = wide layer (4 small tetrahedra)
-            const layers = [];
-            const wideLayers = [];
-
-            if (tri.row === 0) {
-                layers.push(v0Layer);
-            }
-            if (tri.row <= 1) {
-                wideLayers.push(v0Layer);
-            }
+            // Use assignLayers for correct initial layer assignment
+            const layerAssignment = assignLayers(center);
 
             mesh.userData = {
                 face: face.name,
                 index: index,
                 center: center,
                 row: tri.row,
-                layers: layers,
-                wideLayers: wideLayers
+                layers: layerAssignment.layers,
+                wideLayers: layerAssignment.wideLayers
             };
 
             pyraminxState.pieces.push(mesh);
@@ -330,20 +312,55 @@ function setupPyraminxControls() {
         switch(key) {
             case 'u':
                 e.preventDefault();
-                rotatePyraminxLayer('top', clockwise, ctrl);
+                rotatePyraminxLayer('top', clockwise, !ctrl);
                 break;
             case 'l':
                 e.preventDefault();
-                rotatePyraminxLayer('left', clockwise, ctrl);
+                rotatePyraminxLayer('left', clockwise, !ctrl);
                 break;
             case 'r':
                 e.preventDefault();
-                rotatePyraminxLayer('right', clockwise, ctrl);
+                rotatePyraminxLayer('right', clockwise, !ctrl);
                 break;
             case 'b':
                 e.preventDefault();
-                rotatePyraminxLayer('back', clockwise, ctrl);
+                rotatePyraminxLayer('back', clockwise, !ctrl);
                 break;
         }
     });
+}
+
+function scramblePyraminx(moveCount, onComplete) {
+    const layers = ['top', 'left', 'right', 'back'];
+    const moves = [];
+    let lastLayer = null;
+
+    // Generate random moves (default 15 moves)
+    moveCount = moveCount || 15;
+
+    for (let i = 0; i < moveCount; i++) {
+        // Avoid same layer twice in a row
+        let layer;
+        do {
+            layer = layers[Math.floor(Math.random() * layers.length)];
+        } while (layer === lastLayer);
+        lastLayer = layer;
+
+        const clockwise = Math.random() < 0.5;
+        const wide = Math.random() < 0.7; // 70% wide moves
+        moves.push({ layer, clockwise, wide });
+    }
+
+    // Execute moves sequentially
+    let index = 0;
+    function executeNext() {
+        if (index >= moves.length) {
+            if (onComplete) onComplete();
+            return;
+        }
+        const move = moves[index++];
+        rotatePyraminxLayer(move.layer, move.clockwise, move.wide, executeNext);
+    }
+
+    executeNext();
 }

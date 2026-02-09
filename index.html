@@ -40,10 +40,30 @@
                     <p>Camera Feed</p>
                     <small>Click to enable camera</small>
                 </div>
+                <!-- Capture flow UI -->
+                <div class="capture-flow" id="capture-flow">
+                    <div class="capture-progress">
+                        <span class="face-indicator pending" data-face="front">Front</span>
+                        <span class="face-indicator pending" data-face="right">Right</span>
+                        <span class="face-indicator pending" data-face="left">Left</span>
+                        <span class="face-indicator pending" data-face="bottom">Bottom</span>
+                    </div>
+                    <div class="capture-instruction" id="capture-instruction"></div>
+                </div>
+                <!-- Preview overlay -->
+                <div class="color-preview" id="color-preview">
+                    <svg id="preview-triangles"></svg>
+                    <div class="preview-actions">
+                        <button class="camera-btn" id="preview-accept">OK</button>
+                        <button class="camera-btn" id="preview-retry">RETRY</button>
+                    </div>
+                </div>
                 <div class="camera-controls" id="camera-controls">
                     <button class="camera-btn" id="camera-toggle" title="Toggle Camera">OFF</button>
                     <button class="camera-btn" id="camera-snapshot" title="Capture" disabled>SNAP</button>
                     <button class="camera-btn" id="camera-detect" title="Detect Colors" disabled>DETECT</button>
+                    <button class="camera-btn" id="camera-calibrate" title="Calibrate" disabled>CAL</button>
+                    <button class="camera-btn" id="camera-capture" title="Capture Pyraminx" disabled>CAPTURE</button>
                 </div>
                 <div class="camera-status" id="camera-status"></div>
                 <div class="camera-error" id="camera-error"></div>
@@ -111,6 +131,9 @@
                             </div>
                         </div>
                     </div>
+                    <div class="scramble-section">
+                        <button class="scramble-btn" id="scramble-btn">Scramble</button>
+                    </div>
                 </div>
 
                 <h3>Puzzle</h3>
@@ -148,6 +171,23 @@
             </div>
         </aside>
     </main>
+
+    <!-- Calibration Modal -->
+    <div class="modal-overlay" id="calibration-modal">
+        <div class="modal-content">
+            <h3>Color Calibration</h3>
+            <p class="modal-desc">Select a color, point camera at that surface, click SAMPLE</p>
+            <div class="calibration-colors" id="cal-colors"></div>
+            <div class="calibration-sample" id="cal-sample-area">
+                <div class="sample-crosshair"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="camera-btn" id="cal-sample">SAMPLE</button>
+                <button class="camera-btn" id="cal-reset">RESET</button>
+                <button class="camera-btn" id="cal-close">CLOSE</button>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>

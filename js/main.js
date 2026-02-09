@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupPuzzleSelector();
     setupCuboidButtons();
     setupFigureSelector();
+    setupScrambleButton();
 
     // Initialize diagram for default puzzle
     initDiagram(3);
@@ -127,13 +128,13 @@ function setupPuzzleSelector() {
 }
 
 function setupMoveButtons() {
-    // Pyraminx buttons
+    // Pyraminx buttons (Ctrl = tip only, default = wide layer)
     const pyraminxButtons = document.querySelectorAll('#pyraminx-moves .move-btn');
     pyraminxButtons.forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function(e) {
             const move = this.dataset.move;
             const reverse = this.dataset.reverse === 'true';
-            rotatePyraminxLayer(move, !reverse, false);
+            rotatePyraminxLayer(move, !reverse, !e.ctrlKey);
         });
     });
 
@@ -168,6 +169,27 @@ function setupFigureSelector() {
         // Transform to figure
         transformToFigure(figure);
         currentFigure = figure;
+    });
+}
+
+function setupScrambleButton() {
+    const scrambleBtn = document.getElementById('scramble-btn');
+
+    scrambleBtn.addEventListener('click', function() {
+        // Disable button during scramble
+        scrambleBtn.disabled = true;
+        scrambleBtn.textContent = 'Scrambling...';
+
+        function onComplete() {
+            scrambleBtn.disabled = false;
+            scrambleBtn.textContent = 'Scramble';
+        }
+
+        if (currentPuzzle === 'pyraminx') {
+            scramblePyraminx(15, onComplete);
+        } else if (currentPuzzle.startsWith('cube') || currentPuzzle.startsWith('cuboid')) {
+            scrambleCube(null, onComplete);
+        }
     });
 }
 

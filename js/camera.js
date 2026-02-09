@@ -11,6 +11,24 @@ var CUBE_FACE_COLORS = {
     green:  { h: [40, 80], s: [50, 255], v: [50, 255], face: 'back' }
 };
 
+// Pyraminx face colors (HSV values for detection - wider ranges for better detection)
+var PYRAMINX_FACE_COLORS = {
+    red:    { h: [0, 15], s: [80, 255], v: [80, 255], h2: [165, 180], hex: 0xe94560 },
+    green:  { h: [35, 90], s: [40, 255], v: [40, 255], hex: 0x4ecca3 },
+    blue:   { h: [90, 140], s: [80, 255], v: [60, 255], hex: 0x3498db },
+    yellow: { h: [15, 40], s: [80, 255], v: [120, 255], hex: 0xf1c40f }
+};
+
+// Pyraminx capture state
+var pyraminxCaptureState = {
+    isActive: false,
+    currentFace: null,
+    faceOrder: ['front', 'right', 'left', 'bottom'],
+    currentFaceIndex: 0,
+    capturedFaces: {},
+    previewColors: null
+};
+
 // OpenCV.js state
 var cvState = {
     ready: false,
@@ -32,7 +50,15 @@ var cameraState = {
     statusEl: null,
     toggleBtn: null,
     snapshotBtn: null,
-    detectBtn: null
+    detectBtn: null,
+    calibrateBtn: null,
+    captureBtn: null,
+    captureFlow: null,
+    captureInstruction: null,
+    colorPreview: null,
+    previewAcceptBtn: null,
+    previewRetryBtn: null,
+    calibrationModal: null
 };
 
 function initCamera() {
@@ -52,6 +78,16 @@ function initCamera() {
     cameraState.detectBtn = document.getElementById('camera-detect');
     cameraState.statusEl = document.getElementById('camera-status');
 
+    // Pyraminx capture UI elements
+    cameraState.calibrateBtn = document.getElementById('camera-calibrate');
+    cameraState.captureBtn = document.getElementById('camera-capture');
+    cameraState.captureFlow = document.getElementById('capture-flow');
+    cameraState.captureInstruction = document.getElementById('capture-instruction');
+    cameraState.colorPreview = document.getElementById('color-preview');
+    cameraState.previewAcceptBtn = document.getElementById('preview-accept');
+    cameraState.previewRetryBtn = document.getElementById('preview-retry');
+    cameraState.calibrationModal = document.getElementById('calibration-modal');
+
     // Set up event listeners
     if (cameraState.placeholder) {
         cameraState.placeholder.addEventListener('click', function(e) {
@@ -70,7 +106,11 @@ function initCamera() {
     if (cameraState.snapshotBtn) {
         cameraState.snapshotBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            captureSnapshot();
+            if (pyraminxCaptureState.isActive) {
+                capturePyraminxFace();
+            } else {
+                captureSnapshot();
+            }
         });
     }
 
@@ -80,6 +120,64 @@ function initCamera() {
             runColorDetection();
         });
     }
+
+    // Pyraminx capture button handlers
+    if (cameraState.captureBtn) {
+        cameraState.captureBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            startPyraminxCapture();
+        });
+    }
+
+    if (cameraState.calibrateBtn) {
+        cameraState.calibrateBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            showCalibrationModal();
+        });
+    }
+
+    if (cameraState.previewAcceptBtn) {
+        cameraState.previewAcceptBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            confirmFaceCapture();
+        });
+    }
+
+    if (cameraState.previewRetryBtn) {
+        cameraState.previewRetryBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            retryFaceCapture();
+        });
+    }
+
+    // Calibration modal handlers
+    var calSampleBtn = document.getElementById('cal-sample');
+    var calResetBtn = document.getElementById('cal-reset');
+    var calCloseBtn = document.getElementById('cal-close');
+
+    if (calSampleBtn) {
+        calSampleBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            calibrateSelectedColor();
+        });
+    }
+
+    if (calResetBtn) {
+        calResetBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            resetCalibration();
+        });
+    }
+
+    if (calCloseBtn) {
+        calCloseBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            hideCalibrationModal();
+        });
+    }
+
+    // Load saved calibration
+    loadCalibration();
 
     // Initial overlay render
     updateCameraGuide();
@@ -127,6 +225,8 @@ async function startCamera() {
         cameraState.toggleBtn.classList.add('active');
         cameraState.snapshotBtn.disabled = false;
         if (cameraState.detectBtn) cameraState.detectBtn.disabled = false;
+        if (cameraState.calibrateBtn) cameraState.calibrateBtn.disabled = false;
+        if (cameraState.captureBtn) cameraState.captureBtn.disabled = false;
 
         // Set canvas dimensions to match video
         cameraState.canvas.width = cameraState.video.videoWidth;
@@ -164,7 +264,12 @@ function stopCamera() {
     cameraState.toggleBtn.classList.remove('active');
     cameraState.snapshotBtn.disabled = true;
     if (cameraState.detectBtn) cameraState.detectBtn.disabled = true;
+    if (cameraState.calibrateBtn) cameraState.calibrateBtn.disabled = true;
+    if (cameraState.captureBtn) cameraState.captureBtn.disabled = true;
     hideStatus();
+
+    // Reset pyraminx capture state
+    cancelPyraminxCapture();
 
     // Clear overlay
     if (cameraState.overlay) {
@@ -263,35 +368,309 @@ function renderCubeGuide(width, height, size) {
 }
 
 function renderPyraminxGuide(width, height) {
+    const regions = getPyraminxTriangleRegions(width, height);
+    let svg = '';
+
     const centerX = width / 2;
     const centerY = height / 2;
-    const guideSize = Math.min(width, height) * 0.6;
-
-    // Equilateral triangle points
-    const h = guideSize * Math.sqrt(3) / 2;
-    const top = { x: centerX, y: centerY - h / 2 };
-    const bottomLeft = { x: centerX - guideSize / 2, y: centerY + h / 2 };
-    const bottomRight = { x: centerX + guideSize / 2, y: centerY + h / 2 };
-
-    let svg = '';
 
     // Center crosshair
     svg += `<line class="guide-center" x1="${centerX - 10}" y1="${centerY}" x2="${centerX + 10}" y2="${centerY}" />`;
     svg += `<line class="guide-center" x1="${centerX}" y1="${centerY - 10}" x2="${centerX}" y2="${centerY + 10}" />`;
 
-    // Triangle outline
-    svg += `<polygon class="guide-rect" points="${top.x},${top.y} ${bottomLeft.x},${bottomLeft.y} ${bottomRight.x},${bottomRight.y}" />`;
+    // Draw each triangle region
+    regions.forEach((tri, idx) => {
+        const points = tri.vertices.map(v => `${v.x},${v.y}`).join(' ');
+        const isUpward = tri.upward;
 
-    // Inner division lines (3 layers)
-    const midLeft = { x: (top.x + bottomLeft.x) / 2, y: (top.y + bottomLeft.y) / 2 };
-    const midRight = { x: (top.x + bottomRight.x) / 2, y: (top.y + bottomRight.y) / 2 };
-    const midBottom = { x: centerX, y: bottomLeft.y };
+        // Triangle outline
+        svg += `<polygon class="guide-triangle ${isUpward ? 'upward' : 'downward'}" points="${points}" />`;
 
-    svg += `<line class="guide-line" x1="${midLeft.x}" y1="${midLeft.y}" x2="${midRight.x}" y2="${midRight.y}" />`;
-    svg += `<line class="guide-line" x1="${midLeft.x}" y1="${midLeft.y}" x2="${midBottom.x}" y2="${midBottom.y}" />`;
-    svg += `<line class="guide-line" x1="${midRight.x}" y1="${midRight.y}" x2="${midBottom.x}" y2="${midBottom.y}" />`;
+        // Calculate centroid for number label
+        const cx = (tri.vertices[0].x + tri.vertices[1].x + tri.vertices[2].x) / 3;
+        const cy = (tri.vertices[0].y + tri.vertices[1].y + tri.vertices[2].y) / 3;
+
+        // Number label
+        svg += `<text class="guide-number" x="${cx}" y="${cy + 4}">${idx}</text>`;
+    });
 
     return svg;
+}
+
+// Calculate 9 triangle regions for Pyraminx face
+// Layout (3 divisions):
+//        /\           <- Index 0 (tip, row 0)
+//       /--\
+//      /\  /\         <- Indices 1, 2, 3 (row 1: up, DOWN, up)
+//     /--\/--\
+//    /\  /\  /\       <- Indices 4, 5, 6, 7, 8 (row 2: up, DOWN, up, DOWN, up)
+//   /__\/__\/__\
+function getPyraminxTriangleRegions(width, height) {
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const guideSize = Math.min(width, height) * 0.6;
+
+    // Equilateral triangle height
+    const h = guideSize * Math.sqrt(3) / 2;
+
+    // Main triangle vertices
+    const top = { x: centerX, y: centerY - h / 2 };
+    const bottomLeft = { x: centerX - guideSize / 2, y: centerY + h / 2 };
+    const bottomRight = { x: centerX + guideSize / 2, y: centerY + h / 2 };
+
+    // Helper: linear interpolation
+    const lerp = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+
+    // Create a grid of points for 3-division subdivision
+    // Points along left edge (top to bottomLeft)
+    const L0 = top;
+    const L1 = lerp(top, bottomLeft, 1/3);
+    const L2 = lerp(top, bottomLeft, 2/3);
+    const L3 = bottomLeft;
+
+    // Points along right edge (top to bottomRight)
+    const R0 = top;
+    const R1 = lerp(top, bottomRight, 1/3);
+    const R2 = lerp(top, bottomRight, 2/3);
+    const R3 = bottomRight;
+
+    // Points along bottom edge (bottomLeft to bottomRight)
+    const B0 = bottomLeft;
+    const B1 = lerp(bottomLeft, bottomRight, 1/3);
+    const B2 = lerp(bottomLeft, bottomRight, 2/3);
+    const B3 = bottomRight;
+
+    // Interior points at row 1 (1/3 down)
+    const M1_0 = lerp(L1, R1, 0);      // = L1
+    const M1_1 = lerp(L1, R1, 1);      // = R1
+
+    // Interior points at row 2 (2/3 down)
+    const M2_0 = lerp(L2, R2, 0);      // = L2
+    const M2_1 = lerp(L2, R2, 0.5);    // middle of row 2
+    const M2_2 = lerp(L2, R2, 1);      // = R2
+
+    const regions = [];
+
+    // Row 0: 1 upward triangle (tip)
+    regions.push({
+        vertices: [L0, L1, R1],
+        upward: true,
+        row: 0,
+        col: 0
+    });
+
+    // Row 1: 3 triangles (up, down, up)
+    // Index 1: upward left
+    regions.push({
+        vertices: [L1, L2, M2_1],
+        upward: true,
+        row: 1,
+        col: 0
+    });
+    // Index 2: downward center (inverted)
+    regions.push({
+        vertices: [L1, R1, M2_1],
+        upward: false,
+        row: 1,
+        col: 1
+    });
+    // Index 3: upward right
+    regions.push({
+        vertices: [R1, M2_1, R2],
+        upward: true,
+        row: 1,
+        col: 2
+    });
+
+    // Row 2: 5 triangles (up, down, up, down, up)
+    // Index 4: upward far left
+    regions.push({
+        vertices: [L2, L3, B1],
+        upward: true,
+        row: 2,
+        col: 0
+    });
+    // Index 5: downward left-center
+    regions.push({
+        vertices: [L2, B1, M2_1],
+        upward: false,
+        row: 2,
+        col: 1
+    });
+    // Index 6: upward center
+    regions.push({
+        vertices: [M2_1, B1, B2],
+        upward: true,
+        row: 2,
+        col: 2
+    });
+    // Index 7: downward right-center
+    regions.push({
+        vertices: [M2_1, B2, R2],
+        upward: false,
+        row: 2,
+        col: 3
+    });
+    // Index 8: upward far right
+    regions.push({
+        vertices: [R2, B2, R3],
+        upward: true,
+        row: 2,
+        col: 4
+    });
+
+    return regions;
+}
+
+// Check if a point is inside a triangle using barycentric coordinates
+function isPointInTriangle(px, py, v0, v1, v2) {
+    const dX = px - v2.x;
+    const dY = py - v2.y;
+    const dX21 = v2.x - v1.x;
+    const dY12 = v1.y - v2.y;
+    const D = dY12 * (v0.x - v2.x) + dX21 * (v0.y - v2.y);
+    const s = dY12 * dX + dX21 * dY;
+    const t = (v2.y - v0.y) * dX + (v0.x - v2.x) * dY;
+
+    if (D < 0) return s <= 0 && t <= 0 && s + t >= D;
+    return s >= 0 && t >= 0 && s + t <= D;
+}
+
+// Get average HSV color inside a triangle from OpenCV HSV Mat
+function getAverageHSVInTriangle(hsvMat, vertices) {
+    // Get bounding box
+    const minX = Math.max(0, Math.floor(Math.min(vertices[0].x, vertices[1].x, vertices[2].x)));
+    const maxX = Math.min(hsvMat.cols - 1, Math.ceil(Math.max(vertices[0].x, vertices[1].x, vertices[2].x)));
+    const minY = Math.max(0, Math.floor(Math.min(vertices[0].y, vertices[1].y, vertices[2].y)));
+    const maxY = Math.min(hsvMat.rows - 1, Math.ceil(Math.max(vertices[0].y, vertices[1].y, vertices[2].y)));
+
+    let totalH = 0, totalS = 0, totalV = 0;
+    let count = 0;
+
+    // Sample pixels inside triangle with some margin
+    const margin = 0.15;
+    const cx = (vertices[0].x + vertices[1].x + vertices[2].x) / 3;
+    const cy = (vertices[0].y + vertices[1].y + vertices[2].y) / 3;
+
+    // Shrink triangle toward center for better sampling
+    const shrunkVertices = vertices.map(v => ({
+        x: v.x + (cx - v.x) * margin,
+        y: v.y + (cy - v.y) * margin
+    }));
+
+    for (let py = minY; py <= maxY; py++) {
+        for (let px = minX; px <= maxX; px++) {
+            if (isPointInTriangle(px, py, shrunkVertices[0], shrunkVertices[1], shrunkVertices[2])) {
+                const idx = (py * hsvMat.cols + px) * 3;
+                totalH += hsvMat.data[idx];
+                totalS += hsvMat.data[idx + 1];
+                totalV += hsvMat.data[idx + 2];
+                count++;
+            }
+        }
+    }
+
+    if (count === 0) return { h: 0, s: 0, v: 0 };
+
+    return {
+        h: Math.round(totalH / count),
+        s: Math.round(totalS / count),
+        v: Math.round(totalV / count)
+    };
+}
+
+// Identify Pyraminx color from HSV values
+function identifyPyraminxColor(h, s, v) {
+    let bestMatch = null;
+    let bestScore = -1;
+
+    for (const [colorName, colorData] of Object.entries(PYRAMINX_FACE_COLORS)) {
+        // Check if HSV falls within the color's range
+        let hMatch = h >= colorData.h[0] && h <= colorData.h[1];
+        // Red wraps around, check second hue range
+        if (!hMatch && colorData.h2) {
+            hMatch = h >= colorData.h2[0] && h <= colorData.h2[1];
+        }
+        const sMatch = s >= colorData.s[0] && s <= colorData.s[1];
+        const vMatch = v >= colorData.v[0] && v <= colorData.v[1];
+
+        if (hMatch && sMatch && vMatch) {
+            // Calculate match score (how centered in the range)
+            const hCenter = (colorData.h[0] + colorData.h[1]) / 2;
+            const sCenter = (colorData.s[0] + colorData.s[1]) / 2;
+            const vCenter = (colorData.v[0] + colorData.v[1]) / 2;
+            const score = 100 - (Math.abs(h - hCenter) + Math.abs(s - sCenter) * 0.5 + Math.abs(v - vCenter) * 0.5);
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = { name: colorName, hex: colorData.hex };
+            }
+        }
+    }
+
+    return bestMatch;
+}
+
+// Detect colors in 9 triangular regions for Pyraminx
+function detectPyraminxColors() {
+    if (!cvState.ready || !cameraState.isActive) {
+        return null;
+    }
+
+    const imageData = captureSnapshot();
+    if (!imageData) return null;
+
+    const processed = processFrameWithOpenCV(imageData);
+    if (!processed || !processed.hsv) return null;
+
+    const hsv = processed.hsv;
+
+    // Get video display dimensions (what user sees)
+    const displayWidth = cameraState.video.offsetWidth;
+    const displayHeight = cameraState.video.offsetHeight;
+
+    // Get actual video dimensions
+    const videoWidth = hsv.cols;
+    const videoHeight = hsv.rows;
+
+    // Calculate scale factors
+    const scaleX = videoWidth / displayWidth;
+    const scaleY = videoHeight / displayHeight;
+
+    // Get triangle regions in display coordinates
+    const displayRegions = getPyraminxTriangleRegions(displayWidth, displayHeight);
+
+    // Scale regions to video coordinates
+    const videoRegions = displayRegions.map(region => ({
+        ...region,
+        vertices: region.vertices.map(v => ({
+            x: v.x * scaleX,
+            y: v.y * scaleY
+        }))
+    }));
+
+    const colors = [];
+
+    try {
+        videoRegions.forEach((region, idx) => {
+            const avgColor = getAverageHSVInTriangle(hsv, region.vertices);
+            const identified = identifyPyraminxColor(avgColor.h, avgColor.s, avgColor.v);
+
+            colors.push({
+                index: idx,
+                hsv: avgColor,
+                color: identified ? identified.name : 'unknown',
+                hex: identified ? identified.hex : 0x808080,
+                row: region.row,
+                col: region.col,
+                upward: region.upward
+            });
+        });
+    } finally {
+        hsv.delete();
+    }
+
+    return colors;
 }
 
 function renderCuboidGuide(width, height) {
@@ -685,5 +1064,448 @@ function showStatus(message) {
 function hideStatus() {
     if (cameraState.statusEl) {
         cameraState.statusEl.style.display = 'none';
+    }
+}
+
+// ============================================
+// Pyraminx Capture Flow
+// ============================================
+
+// Start multi-face capture flow
+async function startPyraminxCapture() {
+    if (currentPuzzle !== 'pyraminx') {
+        showStatus('Select Pyraminx puzzle first');
+        return;
+    }
+
+    if (!cameraState.isActive) {
+        showStatus('Camera not active');
+        return;
+    }
+
+    // Make sure OpenCV is loaded
+    if (!cvState.ready) {
+        showStatus('Loading OpenCV...');
+        try {
+            await loadOpenCV();
+        } catch (err) {
+            showStatus('Failed to load OpenCV: ' + err.message);
+            return;
+        }
+    }
+
+    // Reset capture state
+    pyraminxCaptureState.isActive = true;
+    pyraminxCaptureState.currentFaceIndex = 0;
+    pyraminxCaptureState.capturedFaces = {};
+    pyraminxCaptureState.previewColors = null;
+    pyraminxCaptureState.currentFace = pyraminxCaptureState.faceOrder[0];
+
+    // Show capture UI
+    if (cameraState.captureFlow) {
+        cameraState.captureFlow.style.display = 'block';
+    }
+    if (cameraState.colorPreview) {
+        cameraState.colorPreview.style.display = 'none';
+    }
+
+    // Update progress indicators
+    updateCaptureProgress();
+    updateCaptureInstruction();
+
+    // Change SNAP button text
+    if (cameraState.snapshotBtn) {
+        cameraState.snapshotBtn.textContent = 'SNAP';
+    }
+
+    // Disable capture button during flow
+    if (cameraState.captureBtn) {
+        cameraState.captureBtn.disabled = true;
+    }
+
+    hideStatus();
+}
+
+// Cancel capture flow
+function cancelPyraminxCapture() {
+    pyraminxCaptureState.isActive = false;
+    pyraminxCaptureState.currentFaceIndex = 0;
+    pyraminxCaptureState.capturedFaces = {};
+    pyraminxCaptureState.previewColors = null;
+    pyraminxCaptureState.currentFace = null;
+
+    // Hide capture UI
+    if (cameraState.captureFlow) {
+        cameraState.captureFlow.style.display = 'none';
+    }
+    if (cameraState.colorPreview) {
+        cameraState.colorPreview.style.display = 'none';
+    }
+
+    // Restore SNAP button
+    if (cameraState.snapshotBtn) {
+        cameraState.snapshotBtn.textContent = 'SNAP';
+    }
+
+    // Re-enable capture button
+    if (cameraState.captureBtn && cameraState.isActive) {
+        cameraState.captureBtn.disabled = false;
+    }
+}
+
+// Capture and detect current face
+function capturePyraminxFace() {
+    if (!pyraminxCaptureState.isActive) {
+        captureSnapshot();
+        return;
+    }
+
+    const colors = detectPyraminxColors();
+    if (!colors) {
+        showStatus('Detection failed - try again');
+        return;
+    }
+
+    pyraminxCaptureState.previewColors = colors;
+
+    // Show preview with detected colors
+    showColorPreview(colors);
+
+    // Flash effect
+    if (cameraState.snapshotBtn) {
+        cameraState.snapshotBtn.classList.add('flash');
+        setTimeout(() => {
+            cameraState.snapshotBtn.classList.remove('flash');
+        }, 200);
+    }
+}
+
+// Show color preview overlay
+function showColorPreview(colors) {
+    if (!cameraState.colorPreview) return;
+
+    const previewSvg = document.getElementById('preview-triangles');
+    if (!previewSvg) return;
+
+    const width = cameraState.video.offsetWidth;
+    const height = cameraState.video.offsetHeight;
+
+    previewSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    const regions = getPyraminxTriangleRegions(width, height);
+    let svg = '';
+
+    regions.forEach((region, idx) => {
+        const color = colors[idx];
+        const hexColor = '#' + color.hex.toString(16).padStart(6, '0');
+        const points = region.vertices.map(v => `${v.x},${v.y}`).join(' ');
+
+        svg += `<polygon class="preview-triangle" points="${points}" fill="${hexColor}" stroke="white" stroke-width="2" />`;
+
+        // Add color label
+        const cx = (region.vertices[0].x + region.vertices[1].x + region.vertices[2].x) / 3;
+        const cy = (region.vertices[0].y + region.vertices[1].y + region.vertices[2].y) / 3;
+        svg += `<text class="preview-label" x="${cx}" y="${cy + 4}">${color.color.substring(0, 1).toUpperCase()}</text>`;
+    });
+
+    previewSvg.innerHTML = svg;
+    cameraState.colorPreview.style.display = 'flex';
+}
+
+// Confirm face capture and move to next
+function confirmFaceCapture() {
+    if (!pyraminxCaptureState.isActive || !pyraminxCaptureState.previewColors) return;
+
+    // Store captured face
+    const faceName = pyraminxCaptureState.currentFace;
+    pyraminxCaptureState.capturedFaces[faceName] = pyraminxCaptureState.previewColors;
+    pyraminxCaptureState.previewColors = null;
+
+    // Hide preview
+    if (cameraState.colorPreview) {
+        cameraState.colorPreview.style.display = 'none';
+    }
+
+    // Move to next face
+    pyraminxCaptureState.currentFaceIndex++;
+
+    if (pyraminxCaptureState.currentFaceIndex >= pyraminxCaptureState.faceOrder.length) {
+        // All faces captured - apply colors
+        finishPyraminxCapture();
+    } else {
+        // Update to next face
+        pyraminxCaptureState.currentFace = pyraminxCaptureState.faceOrder[pyraminxCaptureState.currentFaceIndex];
+        updateCaptureProgress();
+        updateCaptureInstruction();
+    }
+}
+
+// Retry current face capture
+function retryFaceCapture() {
+    pyraminxCaptureState.previewColors = null;
+
+    // Hide preview
+    if (cameraState.colorPreview) {
+        cameraState.colorPreview.style.display = 'none';
+    }
+
+    updateCaptureInstruction();
+}
+
+// Update capture progress indicators
+function updateCaptureProgress() {
+    const indicators = document.querySelectorAll('.face-indicator');
+    indicators.forEach((indicator, idx) => {
+        const face = indicator.dataset.face;
+        const faceIdx = pyraminxCaptureState.faceOrder.indexOf(face);
+
+        indicator.classList.remove('pending', 'active', 'captured');
+
+        if (faceIdx < pyraminxCaptureState.currentFaceIndex) {
+            indicator.classList.add('captured');
+        } else if (faceIdx === pyraminxCaptureState.currentFaceIndex) {
+            indicator.classList.add('active');
+        } else {
+            indicator.classList.add('pending');
+        }
+    });
+}
+
+// Update capture instruction text
+function updateCaptureInstruction() {
+    if (!cameraState.captureInstruction) return;
+
+    const faceName = pyraminxCaptureState.currentFace;
+    const faceNames = {
+        front: 'Front',
+        right: 'Right',
+        left: 'Left',
+        bottom: 'Bottom'
+    };
+
+    cameraState.captureInstruction.textContent = `Position ${faceNames[faceName] || faceName} face, then click SNAP`;
+}
+
+// Finish capture and apply colors to model
+function finishPyraminxCapture() {
+    applyPyraminxColors();
+    cancelPyraminxCapture();
+    showStatus('Colors applied to Pyraminx');
+
+    // Flash capture button
+    if (cameraState.captureBtn) {
+        cameraState.captureBtn.classList.add('flash');
+        setTimeout(() => {
+            cameraState.captureBtn.classList.remove('flash');
+        }, 200);
+    }
+}
+
+// Apply captured colors to 3D model
+function applyPyraminxColors() {
+    if (typeof pyraminxState === 'undefined' || !pyraminxState.pieces || pyraminxState.pieces.length === 0) {
+        console.warn('Pyraminx model not available');
+        return;
+    }
+
+    const faceMap = {
+        front: 'front',
+        right: 'right',
+        left: 'left',
+        bottom: 'bottom'
+    };
+
+    // Map captured colors to model faces
+    for (const [captureFace, colors] of Object.entries(pyraminxCaptureState.capturedFaces)) {
+        const modelFace = faceMap[captureFace];
+        if (!modelFace) continue;
+
+        // Apply colors to the face's triangles
+        colors.forEach((colorData, idx) => {
+            applyColorToTriangle(modelFace, idx, colorData.hex);
+        });
+    }
+
+    // Update the diagram
+    if (typeof updatePyraminxDiagram === 'function') {
+        updatePyraminxDiagram();
+    }
+}
+
+// Apply color to a specific triangle on the model
+function applyColorToTriangle(face, index, hexColor) {
+    if (!pyraminxState || !pyraminxState.pieces) return;
+
+    // Find the piece with matching face and index
+    pyraminxState.pieces.forEach(piece => {
+        if (piece.userData && piece.userData.face === face && piece.userData.index === index) {
+            // Update the material color
+            if (piece.material) {
+                piece.material.color.setHex(hexColor);
+            }
+        }
+    });
+}
+
+// ============================================
+// Color Calibration
+// ============================================
+
+var calibrationState = {
+    selectedColor: null
+};
+
+function showCalibrationModal() {
+    if (!cameraState.calibrationModal) return;
+
+    // Build color buttons
+    const colorsContainer = document.getElementById('cal-colors');
+    if (colorsContainer) {
+        let html = '';
+        for (const [colorName, colorData] of Object.entries(PYRAMINX_FACE_COLORS)) {
+            const hexColor = '#' + colorData.hex.toString(16).padStart(6, '0');
+            html += `<button class="cal-color" data-color="${colorName}" style="background-color: ${hexColor}">${colorName}</button>`;
+        }
+        colorsContainer.innerHTML = html;
+
+        // Add click handlers
+        colorsContainer.querySelectorAll('.cal-color').forEach(btn => {
+            btn.addEventListener('click', function() {
+                selectCalibrationColor(this.dataset.color);
+            });
+        });
+    }
+
+    calibrationState.selectedColor = null;
+    cameraState.calibrationModal.style.display = 'flex';
+}
+
+function hideCalibrationModal() {
+    if (!cameraState.calibrationModal) return;
+
+    cameraState.calibrationModal.style.display = 'none';
+    saveCalibration();
+}
+
+function selectCalibrationColor(colorName) {
+    calibrationState.selectedColor = colorName;
+
+    // Update UI
+    document.querySelectorAll('.cal-color').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.color === colorName);
+    });
+}
+
+function calibrateSelectedColor() {
+    if (!calibrationState.selectedColor) {
+        showStatus('Select a color first');
+        return;
+    }
+
+    if (!cvState.ready || !cameraState.isActive) {
+        showStatus('Camera/OpenCV not ready');
+        return;
+    }
+
+    // Capture center region HSV
+    const imageData = captureSnapshot();
+    if (!imageData) return;
+
+    const processed = processFrameWithOpenCV(imageData);
+    if (!processed || !processed.hsv) return;
+
+    const hsv = processed.hsv;
+
+    try {
+        // Sample center region
+        const centerX = Math.floor(hsv.cols / 2);
+        const centerY = Math.floor(hsv.rows / 2);
+        const sampleSize = 30;
+
+        const avgColor = getAverageHSVInRegion(hsv,
+            centerX - sampleSize / 2,
+            centerY - sampleSize / 2,
+            sampleSize, sampleSize);
+
+        // Update color ranges with tolerance
+        const tolerance = { h: 15, s: 40, v: 40 };
+        const colorData = PYRAMINX_FACE_COLORS[calibrationState.selectedColor];
+
+        if (colorData) {
+            colorData.h = [
+                Math.max(0, avgColor.h - tolerance.h),
+                Math.min(180, avgColor.h + tolerance.h)
+            ];
+            colorData.s = [
+                Math.max(0, avgColor.s - tolerance.s),
+                Math.min(255, avgColor.s + tolerance.s)
+            ];
+            colorData.v = [
+                Math.max(0, avgColor.v - tolerance.v),
+                Math.min(255, avgColor.v + tolerance.v)
+            ];
+
+            // Handle red wraparound
+            if (calibrationState.selectedColor === 'red') {
+                if (avgColor.h < 10) {
+                    colorData.h2 = [170, 180];
+                } else if (avgColor.h > 170) {
+                    colorData.h = [0, 10];
+                    colorData.h2 = [Math.max(170, avgColor.h - tolerance.h), 180];
+                }
+            }
+
+            showStatus(`Calibrated ${calibrationState.selectedColor}: H=${avgColor.h} S=${avgColor.s} V=${avgColor.v}`);
+        }
+    } finally {
+        hsv.delete();
+    }
+}
+
+function resetCalibration() {
+    // Reset to defaults (wider ranges for better detection)
+    PYRAMINX_FACE_COLORS.red = { h: [0, 15], s: [80, 255], v: [80, 255], h2: [165, 180], hex: 0xe94560 };
+    PYRAMINX_FACE_COLORS.green = { h: [35, 90], s: [40, 255], v: [40, 255], hex: 0x4ecca3 };
+    PYRAMINX_FACE_COLORS.blue = { h: [90, 140], s: [80, 255], v: [60, 255], hex: 0x3498db };
+    PYRAMINX_FACE_COLORS.yellow = { h: [15, 40], s: [80, 255], v: [120, 255], hex: 0xf1c40f };
+
+    // Clear localStorage
+    localStorage.removeItem('pyraminxColorCalibration');
+
+    showStatus('Calibration reset to defaults');
+}
+
+function saveCalibration() {
+    const calibration = {};
+    for (const [colorName, colorData] of Object.entries(PYRAMINX_FACE_COLORS)) {
+        calibration[colorName] = {
+            h: colorData.h,
+            s: colorData.s,
+            v: colorData.v,
+            h2: colorData.h2
+        };
+    }
+    localStorage.setItem('pyraminxColorCalibration', JSON.stringify(calibration));
+}
+
+function loadCalibration() {
+    try {
+        const saved = localStorage.getItem('pyraminxColorCalibration');
+        if (saved) {
+            const calibration = JSON.parse(saved);
+            for (const [colorName, ranges] of Object.entries(calibration)) {
+                if (PYRAMINX_FACE_COLORS[colorName]) {
+                    PYRAMINX_FACE_COLORS[colorName].h = ranges.h;
+                    PYRAMINX_FACE_COLORS[colorName].s = ranges.s;
+                    PYRAMINX_FACE_COLORS[colorName].v = ranges.v;
+                    if (ranges.h2) {
+                        PYRAMINX_FACE_COLORS[colorName].h2 = ranges.h2;
+                    }
+                }
+            }
+            console.log('Loaded color calibration from localStorage');
+        }
+    } catch (err) {
+        console.warn('Failed to load color calibration:', err);
     }
 }
