@@ -49,6 +49,7 @@ function setupPuzzleSelector() {
     const pyraminxMoves = document.getElementById('pyraminx-moves');
     const cubeMoves = document.getElementById('cube-moves');
     const cuboidMoves = document.getElementById('cuboid-moves');
+    const floppyMoves = document.getElementById('floppy-moves');
     const diagramPanel = document.getElementById('diagram-panel');
     const figureSection = document.getElementById('figure-section');
     const figureSelect = document.getElementById('figure-select');
@@ -78,6 +79,7 @@ function setupPuzzleSelector() {
             pyraminxMoves.style.display = 'flex';
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'none';
+            floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             initPyraminxDiagram();
@@ -86,6 +88,7 @@ function setupPuzzleSelector() {
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'flex';
             cuboidMoves.style.display = 'none';
+            floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             initDiagram(2);
@@ -94,6 +97,7 @@ function setupPuzzleSelector() {
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'flex';
             cuboidMoves.style.display = 'none';
+            floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             initDiagram(3);
@@ -102,15 +106,26 @@ function setupPuzzleSelector() {
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'flex';
             cuboidMoves.style.display = 'none';
+            floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             initDiagram(4);
+        } else if (puzzle === 'floppy') {
+            currentPuzzleGroup = createFloppyCube();
+            pyraminxMoves.style.display = 'none';
+            cubeMoves.style.display = 'none';
+            cuboidMoves.style.display = 'none';
+            floppyMoves.style.display = 'flex';
+            diagramPanel.style.display = 'flex';
+            figureSection.style.display = 'none';
+            clearDiagram();
         } else if (puzzle === 'cuboid1x2x3') {
             currentFigure = figureSelect.value;
             currentPuzzleGroup = createCuboid(1, 2, 3, currentFigure);
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'flex';
+            floppyMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'block';
             // Show correct move buttons for current figure
@@ -157,6 +172,15 @@ function setupCuboidButtons() {
             rotateCubeLayer(move, true); // 180° moves ignore direction
         });
     });
+
+    // Setup floppy buttons with 180° rotations
+    const floppyButtons = document.querySelectorAll('#floppy-moves .floppy-btn');
+    floppyButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const move = this.dataset.move;
+            rotateCubeLayer(move, true);
+        });
+    });
 }
 
 function setupFigureSelector() {
@@ -187,6 +211,8 @@ function setupScrambleButton() {
 
         if (currentPuzzle === 'pyraminx') {
             scramblePyraminx(15, onComplete);
+        } else if (currentPuzzle === 'floppy') {
+            scrambleFloppyCube(10, onComplete);
         } else if (currentPuzzle.startsWith('cube') || currentPuzzle.startsWith('cuboid')) {
             scrambleCube(null, onComplete);
         }

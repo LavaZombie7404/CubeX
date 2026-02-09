@@ -55,6 +55,41 @@ function createCube(size) {
     return cubeState.group;
 }
 
+function createFloppyCube() {
+    // 1x3x3 floppy cube - flat 3x3 grid
+    const sizeX = 1, sizeY = 3, sizeZ = 3;
+    cubeState.size = 3;
+    cubeState.sizeX = sizeX;
+    cubeState.sizeY = sizeY;
+    cubeState.sizeZ = sizeZ;
+    cubeState.isCuboid = true;
+    cubeState.figure = 'floppy';
+    cubeState.group = new THREE.Group();
+    cubeState.cubies = [];
+
+    for (let x = 0; x < sizeX; x++) {
+        for (let y = 0; y < sizeY; y++) {
+            for (let z = 0; z < sizeZ; z++) {
+                const cubie = createCubie(x, y, z, sizeX, sizeY, sizeZ);
+                const posX = (x - (sizeX - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
+                const posY = (y - (sizeY - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
+                const posZ = (z - (sizeZ - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
+
+                cubie.position.set(posX, posY, posZ);
+                cubie.userData = {
+                    gridPos: { x, y, z },
+                    originalPos: { x: posX, y: posY, z: posZ }
+                };
+
+                cubeState.cubies.push(cubie);
+                cubeState.group.add(cubie);
+            }
+        }
+    }
+
+    return cubeState.group;
+}
+
 // Figure layouts for 1x2x3 cuboid (6 cubies)
 // Each entry has position [x, y, z] and scale factor
 const CUBOID_FIGURES = {
@@ -537,12 +572,15 @@ function rotateCubeLayer(face, clockwise, onComplete) {
     if (cubeState.figure === 'tree') {
         // Tree always uses 180° rotations
         faceIsSquare = false;
+    } else if (cubeState.figure === 'floppy') {
+        // Floppy uses 180° rotations
+        faceIsSquare = false;
     } else if (cubeState.isCuboid) {
         if (face === 'right' || face === 'left') {
             faceIsSquare = cubeState.sizeY === cubeState.sizeZ;
-        } else if (face === 'top' || face === 'bottom') {
+        } else if (face === 'top' || face === 'bottom' || face === 'middle') {
             faceIsSquare = cubeState.sizeX === cubeState.sizeZ;
-        } else if (face === 'front' || face === 'back') {
+        } else if (face === 'front' || face === 'back' || face === 'standing') {
             faceIsSquare = cubeState.sizeX === cubeState.sizeY;
         }
     }
@@ -628,13 +666,20 @@ function getRotationAxis(face, figure) {
     switch (face) {
         case 'right':
         case 'left':
+        case 'innerRight':
+        case 'innerLeft':
             return new THREE.Vector3(1, 0, 0);
         case 'top':
         case 'bottom':
         case 'middle':
+        case 'innerTop':
+        case 'innerBottom':
             return new THREE.Vector3(0, 1, 0);
         case 'front':
         case 'back':
+        case 'standing':
+        case 'innerFront':
+        case 'innerBack':
             return new THREE.Vector3(0, 0, 1);
         default:
             return new THREE.Vector3(0, 1, 0);
@@ -642,7 +687,7 @@ function getRotationAxis(face, figure) {
 }
 
 function getCubiesInLayer(face) {
-    const threshold = 0.25;
+    const threshold = 0.35;
     const layerPosX = (cubeState.sizeX - 1) / 2 * (CUBIE_SIZE * 2 + GAP);
     const layerPosY = (cubeState.sizeY - 1) / 2 * (CUBIE_SIZE * 2 + GAP);
     const layerPosZ = (cubeState.sizeZ - 1) / 2 * (CUBIE_SIZE * 2 + GAP);
@@ -662,6 +707,12 @@ function getCubiesInLayer(face) {
             return false;
         }
 
+        // Inner slice positions for 4x4 (one step in from outer layer)
+        const innerStep = CUBIE_SIZE * 2 + GAP;
+        const innerPosX = layerPosX - innerStep;
+        const innerPosY = layerPosY - innerStep;
+        const innerPosZ = layerPosZ - innerStep;
+
         switch (face) {
             case 'right':
                 return pos.x > layerPosX - threshold;
@@ -675,6 +726,25 @@ function getCubiesInLayer(face) {
                 return pos.z > layerPosZ - threshold;
             case 'back':
                 return pos.z < -layerPosZ + threshold;
+            // Middle layer (equator) for floppy cube and odd-sized cubes
+            case 'middle':
+                return Math.abs(pos.y) < threshold;
+            // Standing slice (middle Z) for floppy cube
+            case 'standing':
+                return Math.abs(pos.z) < threshold;
+            // Inner slices for 4x4
+            case 'innerRight':
+                return Math.abs(pos.x - innerPosX) < threshold;
+            case 'innerLeft':
+                return Math.abs(pos.x + innerPosX) < threshold;
+            case 'innerTop':
+                return Math.abs(pos.y - innerPosY) < threshold;
+            case 'innerBottom':
+                return Math.abs(pos.y + innerPosY) < threshold;
+            case 'innerFront':
+                return Math.abs(pos.z - innerPosZ) < threshold;
+            case 'innerBack':
+                return Math.abs(pos.z + innerPosZ) < threshold;
             default:
                 return false;
         }
@@ -741,7 +811,7 @@ function animateCubeRotation(cubies, axis, targetAngle, duration, clockwise, onC
 function setupCubeControls() {
     document.addEventListener('keydown', function(e) {
         if (e.repeat) return;
-        if (typeof currentPuzzle === 'undefined' || (!currentPuzzle.startsWith('cube') && !currentPuzzle.startsWith('cuboid'))) return;
+        if (typeof currentPuzzle === 'undefined' || (!currentPuzzle.startsWith('cube') && !currentPuzzle.startsWith('cuboid') && currentPuzzle !== 'floppy')) return;
 
         const key = e.key.toLowerCase();
         const shift = e.shiftKey;
@@ -794,12 +864,17 @@ function setupCubeControls() {
 }
 
 function scrambleCube(moveCount, onComplete) {
-    const faces = ['top', 'bottom', 'right', 'left', 'front', 'back'];
+    const outerFaces = ['top', 'bottom', 'right', 'left', 'front', 'back'];
+    const innerFaces = ['innerTop', 'innerBottom', 'innerRight', 'innerLeft', 'innerFront', 'innerBack'];
+
+    // Include inner slices for 4x4 cubes
+    const size = cubeState.sizeX || 3;
+    const faces = size >= 4 ? [...outerFaces, ...innerFaces] : outerFaces;
+
     const moves = [];
     let lastFace = null;
 
     // Scale move count based on cube size
-    const size = cubeState.sizeX || 3;
     moveCount = moveCount || (size * size * 3);
 
     for (let i = 0; i < moveCount; i++) {
@@ -815,6 +890,36 @@ function scrambleCube(moveCount, onComplete) {
     }
 
     // Execute moves sequentially
+    let index = 0;
+    function executeNext() {
+        if (index >= moves.length) {
+            if (onComplete) onComplete();
+            return;
+        }
+        const move = moves[index++];
+        rotateCubeLayer(move.face, move.clockwise, executeNext);
+    }
+
+    executeNext();
+}
+
+function scrambleFloppyCube(moveCount, onComplete) {
+    const faces = ['top', 'middle', 'bottom', 'front', 'standing', 'back'];
+    const moves = [];
+    let lastFace = null;
+
+    moveCount = moveCount || 10;
+
+    for (let i = 0; i < moveCount; i++) {
+        let face;
+        do {
+            face = faces[Math.floor(Math.random() * faces.length)];
+        } while (face === lastFace);
+        lastFace = face;
+
+        moves.push({ face, clockwise: true }); // 180° moves
+    }
+
     let index = 0;
     function executeNext() {
         if (index >= moves.length) {
