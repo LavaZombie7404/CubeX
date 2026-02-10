@@ -32,6 +32,7 @@ function createCube(size) {
     cubeState.sizeY = size;
     cubeState.sizeZ = size;
     cubeState.isCuboid = false;
+    cubeState.figure = null;
     cubeState.group = new THREE.Group();
     cubeState.cubies = [];
 
@@ -922,7 +923,38 @@ function setupCubeControls() {
 
         const key = e.key.toLowerCase();
         const shift = e.shiftKey;
+        const ctrl = e.ctrlKey;
         const clockwise = !shift;
+
+        // Ctrl + key = inner slice (4x4 only)
+        if (ctrl && currentPuzzle === 'cube4') {
+            switch (key) {
+                case 'u':
+                    e.preventDefault();
+                    rotateCubeLayer('innerTop', clockwise);
+                    return;
+                case 'd':
+                    e.preventDefault();
+                    rotateCubeLayer('innerBottom', clockwise);
+                    return;
+                case 'r':
+                    e.preventDefault();
+                    rotateCubeLayer('innerRight', clockwise);
+                    return;
+                case 'l':
+                    e.preventDefault();
+                    rotateCubeLayer('innerLeft', clockwise);
+                    return;
+                case 'f':
+                    e.preventDefault();
+                    rotateCubeLayer('innerFront', clockwise);
+                    return;
+                case 'b':
+                    e.preventDefault();
+                    rotateCubeLayer('innerBack', clockwise);
+                    return;
+            }
+        }
 
         switch (key) {
             case 'u':
