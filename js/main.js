@@ -14,11 +14,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setupPyraminxControls();
     setupCubeControls();
+    setupSQ1Controls();
     setupMoveButtons();
     setupPuzzleSelector();
     setupCuboidButtons();
     setupFigureSelector();
     setupFloppyFigureSelector();
+    setupCube1FigureSelector();
     setupScrambleButton();
     setupSolveButton();
 
@@ -52,6 +54,7 @@ function setupPuzzleSelector() {
     const cubeMoves = document.getElementById('cube-moves');
     const cuboidMoves = document.getElementById('cuboid-moves');
     const floppyMoves = document.getElementById('floppy-moves');
+    const sq1Moves = document.getElementById('sq1-moves');
     const diagramPanel = document.getElementById('diagram-panel');
     const figureSection = document.getElementById('figure-section');
     const figureSelect = document.getElementById('figure-select');
@@ -59,6 +62,8 @@ function setupPuzzleSelector() {
     const floppyFigureSelect = document.getElementById('floppy-figure-select');
     const mirrorColorSection = document.getElementById('mirror-color-section');
     const mirrorColorSelect = document.getElementById('mirror-color-select');
+    const cube1FigureSection = document.getElementById('cube1-figure-section');
+    const cube1FigureSelect = document.getElementById('cube1-figure-select');
 
     selector.addEventListener('change', function() {
         const puzzle = this.value;
@@ -79,6 +84,12 @@ function setupPuzzleSelector() {
         cubeState.isAnimating = false;
         cubeState.animationQueue = [];
 
+        sq1State.group = null;
+        sq1State.pieces = [];
+        sq1State.middleMeshes = [];
+        sq1State.isAnimating = false;
+        sq1State.animationQueue = [];
+
         // Create new puzzle
         if (puzzle === 'pyraminx') {
             currentPuzzleGroup = createPyraminx();
@@ -86,30 +97,38 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
+            sq1Moves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
+            cube1FigureSection.style.display = 'none';
             mirrorColorSection.style.display = 'none';
             initPyraminxDiagram();
         } else if (puzzle === 'cube1') {
-            currentPuzzleGroup = createCube(1);
+            var cube1Figure = cube1FigureSelect.value;
+            var cube1Color = mirrorColorSelect.value;
+            currentPuzzleGroup = createCube(1, cube1Figure, cube1Color);
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
+            sq1Moves.style.display = 'none';
             diagramPanel.style.display = 'none';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
-            mirrorColorSection.style.display = 'none';
+            cube1FigureSection.style.display = 'block';
+            mirrorColorSection.style.display = cube1Figure === 'mirror' ? 'block' : 'none';
         } else if (puzzle === 'cube2') {
             currentPuzzleGroup = createCube(2);
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'flex';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
+            sq1Moves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
+            cube1FigureSection.style.display = 'none';
             mirrorColorSection.style.display = 'none';
             initDiagram(2);
         } else if (puzzle === 'cube3') {
@@ -118,22 +137,27 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'flex';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
+            sq1Moves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
+            cube1FigureSection.style.display = 'none';
             mirrorColorSection.style.display = 'none';
             initDiagram(3);
-        } else if (puzzle === 'cube4') {
-            currentPuzzleGroup = createCube(4);
+        } else if (puzzle === 'cube4' || puzzle === 'cube5' || puzzle === 'cube6' || puzzle === 'cube7') {
+            var cubeSize = parseInt(puzzle.replace('cube', ''));
+            currentPuzzleGroup = createCube(cubeSize);
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'flex';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
+            sq1Moves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
+            cube1FigureSection.style.display = 'none';
             mirrorColorSection.style.display = 'none';
-            initDiagram(4);
+            initDiagram(cubeSize);
         } else if (puzzle === 'floppy') {
             const floppyFigure = floppyFigureSelect.value;
             const mirrorColor = mirrorColorSelect.value;
@@ -142,26 +166,43 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'flex';
+            sq1Moves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'block';
+            cube1FigureSection.style.display = 'none';
             mirrorColorSection.style.display = floppyFigure === 'mirror' ? 'block' : 'none';
             clearDiagram();
         } else if (puzzle === 'cuboid1x2x3') {
             currentFigure = figureSelect.value;
-            currentPuzzleGroup = createCuboid(1, 2, 3, currentFigure);
+            var cuboidColor = mirrorColorSelect.value;
+            currentPuzzleGroup = createCuboid(1, 2, 3, currentFigure, cuboidColor);
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'flex';
             floppyMoves.style.display = 'none';
+            sq1Moves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'block';
             floppyFigureSection.style.display = 'none';
-            mirrorColorSection.style.display = 'none';
+            cube1FigureSection.style.display = 'none';
+            mirrorColorSection.style.display = currentFigure === 'mirror' ? 'block' : 'none';
             // Show correct move buttons for current figure
             updateCuboidMoveButtons(currentFigure);
             // Clear diagram for cuboid (no diagram yet)
             clearDiagram();
+        } else if (puzzle === 'sq1') {
+            currentPuzzleGroup = createSquareOne();
+            pyraminxMoves.style.display = 'none';
+            cubeMoves.style.display = 'none';
+            cuboidMoves.style.display = 'none';
+            floppyMoves.style.display = 'none';
+            sq1Moves.style.display = 'flex';
+            diagramPanel.style.display = 'none';
+            figureSection.style.display = 'none';
+            floppyFigureSection.style.display = 'none';
+            cube1FigureSection.style.display = 'none';
+            mirrorColorSection.style.display = 'none';
         }
 
         sceneRef.add(currentPuzzleGroup);
@@ -195,6 +236,22 @@ function setupMoveButtons() {
             rotateCubeLayer(move, !reverse);
         });
     });
+
+    // SQ-1 buttons
+    const sq1Buttons = document.querySelectorAll('#sq1-moves .sq1-btn');
+    sq1Buttons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const move = this.dataset.move;
+            const amount = parseInt(this.dataset.amount);
+            if (move === 'slice') {
+                if (canSliceSQ1()) {
+                    sliceSQ1();
+                }
+            } else {
+                rotateSQ1Layer(move, amount);
+            }
+        });
+    });
 }
 
 function setupCuboidButtons() {
@@ -218,15 +275,26 @@ function setupCuboidButtons() {
 
 function setupFigureSelector() {
     const figureSelect = document.getElementById('figure-select');
+    const mirrorColorSection = document.getElementById('mirror-color-section');
+    const mirrorColorSelect = document.getElementById('mirror-color-select');
 
     figureSelect.addEventListener('change', function() {
         const figure = this.value;
         if (figure === currentFigure) return;
 
+        mirrorColorSection.style.display = figure === 'mirror' ? 'block' : 'none';
+
         // Transform to figure
         moveHistory = [];
         transformToFigure(figure);
         currentFigure = figure;
+    });
+
+    mirrorColorSelect.addEventListener('change', function() {
+        if (currentPuzzle !== 'cuboid1x2x3') return;
+        if (currentFigure !== 'mirror') return;
+        moveHistory = [];
+        transformToFigure('mirror');
     });
 }
 
@@ -277,6 +345,50 @@ function setupFloppyFigureSelector() {
     });
 }
 
+function setupCube1FigureSelector() {
+    var cube1FigureSelect = document.getElementById('cube1-figure-select');
+    var mirrorColorSection = document.getElementById('mirror-color-section');
+    var mirrorColorSelect = document.getElementById('mirror-color-select');
+
+    cube1FigureSelect.addEventListener('change', function() {
+        var figure = this.value;
+        var color = mirrorColorSelect.value;
+
+        mirrorColorSection.style.display = figure === 'mirror' ? 'block' : 'none';
+        moveHistory = [];
+
+        if (currentPuzzleGroup) {
+            sceneRef.remove(currentPuzzleGroup);
+        }
+        cubeState.group = null;
+        cubeState.cubies = [];
+        cubeState.isAnimating = false;
+        cubeState.animationQueue = [];
+
+        currentPuzzleGroup = createCube(1, figure, color);
+        sceneRef.add(currentPuzzleGroup);
+    });
+
+    mirrorColorSelect.addEventListener('change', function() {
+        if (currentPuzzle !== 'cube1') return;
+        var figure = cube1FigureSelect.value;
+        if (figure !== 'mirror') return;
+        var color = this.value;
+        moveHistory = [];
+
+        if (currentPuzzleGroup) {
+            sceneRef.remove(currentPuzzleGroup);
+        }
+        cubeState.group = null;
+        cubeState.cubies = [];
+        cubeState.isAnimating = false;
+        cubeState.animationQueue = [];
+
+        currentPuzzleGroup = createCube(1, 'mirror', color);
+        sceneRef.add(currentPuzzleGroup);
+    });
+}
+
 function setupScrambleButton() {
     const scrambleBtn = document.getElementById('scramble-btn');
 
@@ -297,6 +409,8 @@ function setupScrambleButton() {
             scramblePyraminx(15, onComplete);
         } else if (currentPuzzle === 'floppy') {
             scrambleFloppyCube(10, onComplete);
+        } else if (currentPuzzle === 'sq1') {
+            scrambleSQ1(20, onComplete);
         } else if (currentPuzzle.startsWith('cube') || currentPuzzle.startsWith('cuboid')) {
             scrambleCube(null, onComplete);
         }
@@ -327,7 +441,8 @@ function transformToFigure(targetFigure) {
     cubeState.isAnimating = false;
     cubeState.animationQueue = [];
 
-    currentPuzzleGroup = createCuboid(1, 2, 3, targetFigure);
+    var color = document.getElementById('mirror-color-select').value;
+    currentPuzzleGroup = createCuboid(1, 2, 3, targetFigure, color);
     sceneRef.add(currentPuzzleGroup);
 
     // Show correct move buttons for figure
@@ -338,7 +453,7 @@ function setupSolveButton() {
     const solveBtn = document.getElementById('solve-btn');
 
     solveBtn.addEventListener('click', function() {
-        if (cubeState.isAnimating || pyraminxState.isAnimating) return;
+        if (cubeState.isAnimating || pyraminxState.isAnimating || sq1State.isAnimating) return;
 
         solveBtn.disabled = true;
         solveBtn.textContent = 'Solving...';

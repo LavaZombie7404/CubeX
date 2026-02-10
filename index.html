@@ -143,6 +143,17 @@
                             <button class="move-btn floppy-btn" data-move="back">B</button>
                         </div>
                     </div>
+                    <div class="move-buttons" id="sq1-moves" style="display: none;">
+                        <div class="move-row">
+                            <button class="move-btn sq1-btn" data-move="top" data-amount="1">U</button>
+                            <button class="move-btn sq1-btn" data-move="top" data-amount="-1">U'</button>
+                            <button class="move-btn sq1-btn" data-move="bottom" data-amount="1">D</button>
+                            <button class="move-btn sq1-btn" data-move="bottom" data-amount="-1">D'</button>
+                        </div>
+                        <div class="move-row">
+                            <button class="move-btn sq1-btn" data-move="slice" data-amount="0">/</button>
+                        </div>
+                    </div>
                     <div class="scramble-section">
                         <button class="scramble-btn" id="scramble-btn">Scramble</button>
                         <button class="scramble-btn" id="solve-btn">Solve</button>
@@ -156,8 +167,12 @@
                     <option value="cube2">2x2 Cube</option>
                     <option value="cube3" selected>3x3 Cube</option>
                     <option value="cube4">4x4 Cube</option>
+                    <option value="cube5">5x5 Cube</option>
+                    <option value="cube6">6x6 Cube</option>
+                    <option value="cube7">7x7 Cube</option>
                     <option value="floppy">1x3x3 Floppy</option>
                     <option value="cuboid1x2x3">1x2x3 Cuboid</option>
+                    <option value="sq1">Square-1</option>
                 </select>
 
                 <div id="figure-section" style="display: none;">
@@ -165,6 +180,15 @@
                     <select id="figure-select">
                         <option value="block" selected>Block</option>
                         <option value="tree">Tree</option>
+                        <option value="mirror">Mirror</option>
+                    </select>
+                </div>
+
+                <div id="cube1-figure-section" style="display: none;">
+                    <h3>Figure</h3>
+                    <select id="cube1-figure-select">
+                        <option value="block" selected>Block</option>
+                        <option value="mirror">Mirror</option>
                     </select>
                 </div>
 
@@ -227,6 +251,7 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="js/pyraminx.js"></script>
     <script src="js/cube.js"></script>
+    <script src="js/sq1.js"></script>
     <script src="js/diagram.js"></script>
     <script src="js/scene.js"></script>
     <script src="js/camera.js"></script>

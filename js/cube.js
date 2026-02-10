@@ -25,8 +25,10 @@ var cubeState = {
 var moveHistory = [];
 var isSolving = false;
 
-function createCube(size) {
+function createCube(size, figure, color) {
     size = size || 2;
+    figure = figure || 'block';
+    color = color || 'red';
     cubeState.size = size;
     cubeState.sizeX = size;
     cubeState.sizeY = size;
@@ -35,6 +37,29 @@ function createCube(size) {
     cubeState.figure = null;
     cubeState.group = new THREE.Group();
     cubeState.cubies = [];
+
+    if (size === 1 && figure === 'mirror') {
+        cubeState.figure = 'mirror';
+        var mirrorColor = MIRROR_COLORS[color] || MIRROR_COLORS.red;
+        var geometry = new THREE.BoxGeometry(
+            CUBIE_SIZE * 2 * 0.70,
+            CUBIE_SIZE * 2 * 1.00,
+            CUBIE_SIZE * 2 * 1.30
+        );
+        var material = new THREE.MeshLambertMaterial({ color: mirrorColor });
+        var cubie = new THREE.Mesh(geometry, material);
+        var edgesGeometry = new THREE.EdgesGeometry(geometry);
+        var edges = new THREE.LineSegments(edgesGeometry, new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 }));
+        cubie.add(edges);
+        cubie.position.set(0, 0, 0);
+        cubie.userData = {
+            gridPos: { x: 0, y: 0, z: 0 },
+            originalPos: { x: 0, y: 0, z: 0 }
+        };
+        cubeState.cubies.push(cubie);
+        cubeState.group.add(cubie);
+        return cubeState.group;
+    }
 
     for (let x = 0; x < size; x++) {
         for (let y = 0; y < size; y++) {
@@ -194,6 +219,33 @@ function createMirrorPiece(y, z, color) {
     return cubie;
 }
 
+function createCuboidMirrorPiece(y, z, color) {
+    var mirrorColor = MIRROR_COLORS[color] || MIRROR_COLORS.red;
+
+    var rH = [0.60, 1.10, 1.30]; // row heights (3 rows)
+    var cD = [0.70, 1.30];       // column depths (2 cols)
+
+    var h = rH[y] || 1.0;
+    var d = cD[z] || 1.0;
+
+    var scale = 0.9;
+    var geometry = new THREE.BoxGeometry(
+        CUBIE_SIZE * 2 * scale,
+        CUBIE_SIZE * 2 * h * scale,
+        CUBIE_SIZE * 2 * d * scale
+    );
+
+    var material = new THREE.MeshLambertMaterial({ color: mirrorColor });
+    var cubie = new THREE.Mesh(geometry, material);
+
+    var edgesGeometry = new THREE.EdgesGeometry(geometry);
+    var edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+    var edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+    cubie.add(edges);
+
+    return cubie;
+}
+
 // Figure layouts for 1x2x3 cuboid (6 cubies)
 // Each entry has position [x, y, z] and scale factor
 const CUBOID_FIGURES = {
@@ -230,26 +282,70 @@ const CUBOID_FIGURES = {
 
 var currentCuboidFigure = 'block';
 
-function createCuboid(sizeX, sizeY, sizeZ, figure) {
+function createCuboid(sizeX, sizeY, sizeZ, figure, color) {
     figure = figure || 'block';
+    color = color || 'red';
     currentCuboidFigure = figure;
 
-    // Set dimensions based on figure layout
-    if (figure === 'block' || figure === 'tree') {
-        // Both use 1x3x2 layout (X=1, Y=3 rows, Z=2 depth)
-        cubeState.sizeX = 1;
-        cubeState.sizeY = 3;
-        cubeState.sizeZ = 2;
-    } else {
-        cubeState.sizeX = sizeX;
-        cubeState.sizeY = sizeY;
-        cubeState.sizeZ = sizeZ;
-    }
-    cubeState.size = Math.max(cubeState.sizeX, cubeState.sizeY, cubeState.sizeZ);
+    // All figures use 1x3x2 layout (X=1, Y=3 rows, Z=2 depth)
+    cubeState.sizeX = 1;
+    cubeState.sizeY = 3;
+    cubeState.sizeZ = 2;
+    cubeState.size = 3;
     cubeState.isCuboid = true;
     cubeState.figure = figure;
     cubeState.group = new THREE.Group();
     cubeState.cubies = [];
+
+    if (figure === 'mirror') {
+        var mirrorScale = 0.9;
+        var rH = [0.60, 1.10, 1.30];
+        var cD = [0.70, 1.30];
+
+        var mirrorPosY = [];
+        var cumY = 0;
+        for (var r = 0; r < 3; r++) {
+            var halfH = CUBIE_SIZE * rH[r] * mirrorScale;
+            mirrorPosY[r] = cumY + halfH;
+            cumY += halfH * 2;
+        }
+        var centerY = mirrorPosY[1];
+        for (var r = 0; r < 3; r++) mirrorPosY[r] -= centerY;
+
+        var mirrorPosZ = [];
+        var cumZ = 0;
+        for (var c = 0; c < 2; c++) {
+            var halfD = CUBIE_SIZE * cD[c] * mirrorScale;
+            mirrorPosZ[c] = cumZ + halfD;
+            cumZ += halfD * 2;
+        }
+        var centerZ = (mirrorPosZ[0] + mirrorPosZ[1]) / 2;
+        for (var c = 0; c < 2; c++) mirrorPosZ[c] -= centerZ;
+
+        cubeState.mirrorPosY = mirrorPosY.slice();
+        cubeState.mirrorPosZ = mirrorPosZ.slice();
+
+        for (var y = 0; y < 3; y++) {
+            for (var z = 0; z < 2; z++) {
+                var cubie = createCuboidMirrorPiece(y, z, color);
+                var posX = 0;
+                var posY = mirrorPosY[y];
+                var posZ = mirrorPosZ[z];
+
+                cubie.position.set(posX, posY, posZ);
+                cubie.userData = {
+                    gridPos: { x: 0, y: y, z: z },
+                    originalPos: { x: posX, y: posY, z: posZ },
+                    figureIndex: y * 2 + z
+                };
+
+                cubeState.cubies.push(cubie);
+                cubeState.group.add(cubie);
+            }
+        }
+
+        return cubeState.group;
+    }
 
     const figureData = CUBOID_FIGURES[figure] || CUBOID_FIGURES.block;
     const unit = CUBIE_SIZE * 2 + GAP;
@@ -771,27 +867,12 @@ function getRotationAxis(face, figure) {
         return new THREE.Vector3(0, 1, 0);
     }
 
-    switch (face) {
-        case 'right':
-        case 'left':
-        case 'innerRight':
-        case 'innerLeft':
-            return new THREE.Vector3(1, 0, 0);
-        case 'top':
-        case 'bottom':
-        case 'middle':
-        case 'innerTop':
-        case 'innerBottom':
-            return new THREE.Vector3(0, 1, 0);
-        case 'front':
-        case 'back':
-        case 'standing':
-        case 'innerFront':
-        case 'innerBack':
-            return new THREE.Vector3(0, 0, 1);
-        default:
-            return new THREE.Vector3(0, 1, 0);
-    }
+    // Determine axis from face name (supports innerNRight, inner2Top, etc.)
+    var fl = face.toLowerCase();
+    if (fl.includes('right') || fl.includes('left') || fl === 'middlex') return new THREE.Vector3(1, 0, 0);
+    if (fl.includes('top') || fl.includes('bottom') || fl === 'middle') return new THREE.Vector3(0, 1, 0);
+    if (fl.includes('front') || fl.includes('back') || fl === 'standing') return new THREE.Vector3(0, 0, 1);
+    return new THREE.Vector3(0, 1, 0);
 }
 
 function getCubiesInLayer(face) {
@@ -840,7 +921,10 @@ function getCubiesInLayer(face) {
             // Standing slice (middle Z) for floppy cube
             case 'standing':
                 return Math.abs(pos.z) < threshold;
-            // Inner slices for 4x4
+            // Middle X slice (for odd cubes)
+            case 'middleX':
+                return Math.abs(pos.x) < threshold;
+            // Inner slices depth 1
             case 'innerRight':
                 return Math.abs(pos.x - innerPosX) < threshold;
             case 'innerLeft':
@@ -854,6 +938,19 @@ function getCubiesInLayer(face) {
             case 'innerBack':
                 return Math.abs(pos.z + innerPosZ) < threshold;
             default:
+                // Generic inner slice handler: inner2Top, inner3Right, etc.
+                var innerMatch = face.match(/^inner(\d+)(Right|Left|Top|Bottom|Front|Back)$/);
+                if (innerMatch) {
+                    var depth = parseInt(innerMatch[1]);
+                    var dir = innerMatch[2];
+                    var depthOffset = depth * innerStep;
+                    if (dir === 'Right') return Math.abs(pos.x - (layerPosX - depthOffset)) < threshold;
+                    if (dir === 'Left') return Math.abs(pos.x + (layerPosX - depthOffset)) < threshold;
+                    if (dir === 'Top') return Math.abs(pos.y - (layerPosY - depthOffset)) < threshold;
+                    if (dir === 'Bottom') return Math.abs(pos.y + (layerPosY - depthOffset)) < threshold;
+                    if (dir === 'Front') return Math.abs(pos.z - (layerPosZ - depthOffset)) < threshold;
+                    if (dir === 'Back') return Math.abs(pos.z + (layerPosZ - depthOffset)) < threshold;
+                }
                 return false;
         }
     });
@@ -917,6 +1014,12 @@ function animateCubeRotation(cubies, axis, targetAngle, duration, clockwise, onC
 }
 
 function setupCubeControls() {
+    var innerDepth = 0;
+
+    document.addEventListener('keyup', function(e) {
+        if (e.key === 'Control') innerDepth = 0;
+    });
+
     document.addEventListener('keydown', function(e) {
         if (e.repeat) return;
         if (typeof currentPuzzle === 'undefined' || (!currentPuzzle.startsWith('cube') && !currentPuzzle.startsWith('cuboid') && currentPuzzle !== 'floppy')) return;
@@ -926,33 +1029,29 @@ function setupCubeControls() {
         const ctrl = e.ctrlKey;
         const clockwise = !shift;
 
-        // Ctrl + key = inner slice (4x4 only)
-        if (ctrl && currentPuzzle === 'cube4') {
+        var cubeSize = cubeState.sizeX || 3;
+
+        // Ctrl + digit = buffer inner slice depth
+        if (ctrl && key >= '2' && key <= '9' && currentPuzzle.startsWith('cube')) {
+            innerDepth = parseInt(key);
+            e.preventDefault();
+            return;
+        }
+
+        // Ctrl + face key = inner slice at buffered depth (default 1)
+        if (ctrl && cubeSize >= 4 && currentPuzzle.startsWith('cube')) {
+            var depth = innerDepth || 1;
+            var maxDepth = Math.floor((cubeSize - 1) / 2);
+            innerDepth = 0;
+            if (depth > maxDepth) return;
+            var prefix = depth === 1 ? 'inner' : 'inner' + depth;
             switch (key) {
-                case 'u':
-                    e.preventDefault();
-                    rotateCubeLayer('innerTop', clockwise);
-                    return;
-                case 'd':
-                    e.preventDefault();
-                    rotateCubeLayer('innerBottom', clockwise);
-                    return;
-                case 'r':
-                    e.preventDefault();
-                    rotateCubeLayer('innerRight', clockwise);
-                    return;
-                case 'l':
-                    e.preventDefault();
-                    rotateCubeLayer('innerLeft', clockwise);
-                    return;
-                case 'f':
-                    e.preventDefault();
-                    rotateCubeLayer('innerFront', clockwise);
-                    return;
-                case 'b':
-                    e.preventDefault();
-                    rotateCubeLayer('innerBack', clockwise);
-                    return;
+                case 'u': e.preventDefault(); rotateCubeLayer(prefix + 'Top', clockwise); return;
+                case 'd': e.preventDefault(); rotateCubeLayer(prefix + 'Bottom', clockwise); return;
+                case 'r': e.preventDefault(); rotateCubeLayer(prefix + 'Right', clockwise); return;
+                case 'l': e.preventDefault(); rotateCubeLayer(prefix + 'Left', clockwise); return;
+                case 'f': e.preventDefault(); rotateCubeLayer(prefix + 'Front', clockwise); return;
+                case 'b': e.preventDefault(); rotateCubeLayer(prefix + 'Back', clockwise); return;
             }
         }
 
@@ -1008,11 +1107,19 @@ function setupCubeControls() {
 
 function scrambleCube(moveCount, onComplete) {
     const outerFaces = ['top', 'bottom', 'right', 'left', 'front', 'back'];
-    const innerFaces = ['innerTop', 'innerBottom', 'innerRight', 'innerLeft', 'innerFront', 'innerBack'];
+    const dirs = ['Top', 'Bottom', 'Right', 'Left', 'Front', 'Back'];
+    const middleFaces = ['middle', 'standing', 'middleX'];
 
-    // Include inner slices for 4x4 cubes
     const size = cubeState.sizeX || 3;
-    const faces = size >= 4 ? [...outerFaces, ...innerFaces] : outerFaces;
+    var faces = outerFaces.slice();
+    var maxDepth = Math.floor((size - 1) / 2);
+    for (var d = 1; d <= maxDepth; d++) {
+        var prefix = d === 1 ? 'inner' : 'inner' + d;
+        for (var i = 0; i < dirs.length; i++) {
+            faces.push(prefix + dirs[i]);
+        }
+    }
+    if (size >= 5 && size % 2 === 1) faces = faces.concat(middleFaces);
 
     const moves = [];
     let lastFace = null;
@@ -1247,6 +1354,12 @@ function solveFromHistory(onComplete) {
         const move = reversedMoves[index++];
         if (move.type === 'pyraminx') {
             rotatePyraminxLayer(move.face, !move.clockwise, move.wide, next);
+        } else if (move.type === 'sq1') {
+            if (move.move === 'slice') {
+                sliceSQ1(next);
+            } else {
+                rotateSQ1Layer(move.move, -move.amount, next);
+            }
         } else {
             rotateCubeLayer(move.face, !move.clockwise, next);
         }
