@@ -1,3 +1,7 @@
+// Shared globals (pyraminx.js loads first, cube.js also declares these)
+var moveHistory = [];
+var isSolving = false;
+
 const PYRAMINX_COLORS = {
     front: 0xe94560,    // red
     right: 0x4ecca3,    // green
@@ -209,9 +213,16 @@ function rotatePyraminxLayer(layerName, clockwise, wide, onComplete) {
         p.userData[layerKey].includes(layerName)
     );
 
-    if (layerPieces.length === 0) return;
+    if (layerPieces.length === 0) {
+        if (onComplete) onComplete();
+        return;
+    }
 
     pyraminxState.isAnimating = true;
+
+    if (!isSolving) {
+        moveHistory.push({ type: 'pyraminx', face: layerName, clockwise: clockwise, wide: wide });
+    }
 
     animateRotation(layerPieces, pivot, axis, angle, 300, function() {
         pyraminxState.isAnimating = false;

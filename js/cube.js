@@ -22,6 +22,9 @@ var cubeState = {
     animationQueue: []
 };
 
+var moveHistory = [];
+var isSolving = false;
+
 function createCube(size) {
     size = size || 2;
     cubeState.size = size;
@@ -77,6 +80,40 @@ function createFloppyCube(figure, color) {
     cubeState.group = new THREE.Group();
     cubeState.cubies = [];
 
+    // For mirror: compute positions so pieces touch (no gaps)
+    // Row heights and column widths from mirror piece sizes
+    const mirrorScale = 0.9;
+    const rowH = [0.60, 1.10, 1.30];  // h values per row
+    const colW = [0.60, 1.10, 1.30];  // w values per col
+
+    // Precompute centered Y positions for mirror
+    const mirrorPosY = [];
+    const mirrorPosZ = [];
+    if (figure === 'mirror') {
+        let cumY = 0;
+        for (let r = 0; r < 3; r++) {
+            const halfH = CUBIE_SIZE * rowH[r] * mirrorScale;
+            mirrorPosY[r] = cumY + halfH;
+            cumY += halfH * 2;
+        }
+        // Center on the middle piece (row 1) so rotation pivot is at center piece
+        const centerY = mirrorPosY[1];
+        for (let r = 0; r < 3; r++) mirrorPosY[r] -= centerY;
+
+        let cumZ = 0;
+        for (let c = 0; c < 3; c++) {
+            const halfW = CUBIE_SIZE * colW[c] * mirrorScale;
+            mirrorPosZ[c] = cumZ + halfW;
+            cumZ += halfW * 2;
+        }
+        // Center on the middle piece (col 1) so rotation pivot is at center piece
+        const centerZ = mirrorPosZ[1];
+        for (let c = 0; c < 3; c++) mirrorPosZ[c] -= centerZ;
+
+        cubeState.mirrorPosY = mirrorPosY.slice();
+        cubeState.mirrorPosZ = mirrorPosZ.slice();
+    }
+
     for (let x = 0; x < sizeX; x++) {
         for (let y = 0; y < sizeY; y++) {
             for (let z = 0; z < sizeZ; z++) {
@@ -88,9 +125,16 @@ function createFloppyCube(figure, color) {
                     cubie = createCubie(x, y, z, sizeX, sizeY, sizeZ);
                 }
 
-                const posX = (x - (sizeX - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
-                const posY = (y - (sizeY - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
-                const posZ = (z - (sizeZ - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
+                let posX, posY, posZ;
+                if (figure === 'mirror') {
+                    posX = 0;
+                    posY = mirrorPosY[y];
+                    posZ = mirrorPosZ[z];
+                } else {
+                    posX = (x - (sizeX - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
+                    posY = (y - (sizeY - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
+                    posZ = (z - (sizeZ - 1) / 2) * (CUBIE_SIZE * 2 + GAP);
+                }
 
                 cubie.position.set(posX, posY, posZ);
                 cubie.userData = {
@@ -110,29 +154,31 @@ function createFloppyCube(figure, color) {
 function createMirrorPiece(y, z, color) {
     const mirrorColor = MIRROR_COLORS[color] || MIRROR_COLORS.red;
 
-    // Each piece has unique size - all form a square when solved
+    // Each piece has unique size - all form a rectangle when solved
+    // Row heights and col widths: small, medium, large
+    // Center (row 1, col 1) sits closer to the smallest corner (0,0)
+    const rH = [0.60, 1.10, 1.30]; // row heights
+    const cW = [0.60, 1.10, 1.30]; // col widths
     const sizes = {
-        // Corners - each different size
-        '0,0': { h: 0.75, w: 0.75 },   // tiny corner
-        '0,2': { h: 0.7, w: 0.7 },     // small corner
-        '2,0': { h: 0.81, w: 0.81 },   // normal corner
-        '2,2': { h: 0.55, w: 0.55 },   // big corner
-        // Edges - each different size
-        '0,1': { h: 0.75, w: 1.25 },   // tiny edge
-        '2,1': { h: 0.725, w: 0.725 }, // moving edge
-        '1,0': { h: 1.25, w: 0.75 },   // normal edge
-        '1,2': { h: 0.725, w: 0.725 }, // moving edge
-        // Center
-        '1,1': { h: 1.25, w: 1.25 }    // center piece
+        '0,0': { h: rH[0], w: cW[0] },
+        '0,1': { h: rH[0], w: cW[1] },
+        '0,2': { h: rH[0], w: cW[2] },
+        '1,0': { h: rH[1], w: cW[0] },
+        '1,1': { h: rH[1], w: cW[1] },
+        '1,2': { h: rH[1], w: cW[2] },
+        '2,0': { h: rH[2], w: cW[0] },
+        '2,1': { h: rH[2], w: cW[1] },
+        '2,2': { h: rH[2], w: cW[2] }
     };
 
     const key = `${y},${z}`;
     const size = sizes[key] || { h: 1.0, w: 1.0 };
 
+    const scale = 0.9;
     const geometry = new THREE.BoxGeometry(
-        CUBIE_SIZE * 2,
-        CUBIE_SIZE * 2 * size.h,
-        CUBIE_SIZE * 2 * size.w
+        CUBIE_SIZE * 2 * scale,
+        CUBIE_SIZE * 2 * size.h * scale,
+        CUBIE_SIZE * 2 * size.w * scale
     );
 
     const material = new THREE.MeshLambertMaterial({ color: mirrorColor });
@@ -612,17 +658,21 @@ function rotateCubeLayer(face, clockwise, onComplete) {
     // Check if move is valid for cuboid dimensions (skip for tree - has custom moves)
     if (cubeState.isCuboid && cubeState.figure !== 'tree') {
         // Block moves on axes with only 1 layer
-        if ((face === 'right' || face === 'left') && cubeState.sizeX === 1) return;
-        if ((face === 'top' || face === 'bottom') && cubeState.sizeY === 1) return;
-        if ((face === 'front' || face === 'back') && cubeState.sizeZ === 1) return;
+        if ((face === 'right' || face === 'left') && cubeState.sizeX === 1) { if (onComplete) onComplete(); return; }
+        if ((face === 'top' || face === 'bottom') && cubeState.sizeY === 1) { if (onComplete) onComplete(); return; }
+        if ((face === 'front' || face === 'back') && cubeState.sizeZ === 1) { if (onComplete) onComplete(); return; }
     }
 
     const axis = getRotationAxis(face, cubeState.figure);
     const layerCubies = getCubiesInLayer(face);
 
-    if (layerCubies.length === 0) return;
+    if (layerCubies.length === 0) { if (onComplete) onComplete(); return; }
 
     cubeState.isAnimating = true;
+
+    if (!isSolving) {
+        moveHistory.push({ type: 'cube', face: face, clockwise: clockwise });
+    }
 
     // Check if face is square (required for 90° turns)
     let faceIsSquare = true;
@@ -908,6 +958,10 @@ function setupCubeControls() {
                 e.preventDefault();
                 rotateCubeLayer('middle', clockwise);
                 break;
+            case 's':
+                e.preventDefault();
+                rotateCubeLayer('standing', clockwise);
+                break;
             case 'v':
                 e.preventDefault();
                 rotateCubeLayer('left', clockwise);
@@ -985,6 +1039,203 @@ function scrambleFloppyCube(moveCount, onComplete) {
         }
         const move = moves[index++];
         rotateCubeLayer(move.face, move.clockwise, executeNext);
+    }
+
+    executeNext();
+}
+
+// ==================== Floppy Cube Solver ====================
+
+// Orientation group: {I=0, Rx=1, Ry=2, Rz=3}
+// Composition table for applying rotations (Klein four-group)
+const FLOPPY_APPLY_RY = [2, 3, 0, 1]; // ori -> ori after Ry (180° around Y)
+const FLOPPY_APPLY_RZ = [3, 2, 1, 0]; // ori -> ori after Rz (180° around Z)
+
+// Move definitions: which grid positions are affected
+// Grid index = y*3 + z, y=row(0=bottom,1=mid,2=top), z=col(0=back,1=standing,2=front)
+const FLOPPY_MOVES = [
+    { name: 'top',      indices: [6, 7, 8], applyOri: FLOPPY_APPLY_RY }, // U: top row, Y-axis
+    { name: 'middle',   indices: [3, 4, 5], applyOri: FLOPPY_APPLY_RY }, // M: middle row, Y-axis
+    { name: 'bottom',   indices: [0, 1, 2], applyOri: FLOPPY_APPLY_RY }, // D: bottom row, Y-axis
+    { name: 'front',    indices: [2, 5, 8], applyOri: FLOPPY_APPLY_RZ }, // F: front col, Z-axis
+    { name: 'standing', indices: [1, 4, 7], applyOri: FLOPPY_APPLY_RZ }, // S: standing col, Z-axis
+    { name: 'back',     indices: [0, 3, 6], applyOri: FLOPPY_APPLY_RZ }, // B: back col, Z-axis
+];
+
+function getFloppyOrientation(quaternion) {
+    const q = quaternion;
+    const absW = Math.abs(q.w);
+    const absX = Math.abs(q.x);
+    const absY = Math.abs(q.y);
+    const absZ = Math.abs(q.z);
+    const max = Math.max(absW, absX, absY, absZ);
+    if (max === absW) return 0; // Identity
+    if (max === absX) return 1; // Rx (180° around X)
+    if (max === absY) return 2; // Ry (180° around Y)
+    return 3;                   // Rz (180° around Z)
+}
+
+function getFloppyState() {
+    const state = new Array(9);
+    const isMirror = cubeState.figure === 'mirror';
+    const unit = CUBIE_SIZE * 2 + GAP;
+
+    cubeState.cubies.forEach(function(cubie) {
+        // Piece identity from original grid position
+        const gp = cubie.userData.gridPos;
+        const pieceId = gp.y * 3 + gp.z;
+
+        // Current 3D position -> current grid index
+        let curY, curZ;
+        if (isMirror) {
+            // Find closest match in mirrorPosY/mirrorPosZ arrays
+            let bestY = 0, bestDistY = Infinity;
+            for (let r = 0; r < 3; r++) {
+                const d = Math.abs(cubie.position.y - cubeState.mirrorPosY[r]);
+                if (d < bestDistY) { bestDistY = d; bestY = r; }
+            }
+            let bestZ = 0, bestDistZ = Infinity;
+            for (let c = 0; c < 3; c++) {
+                const d = Math.abs(cubie.position.z - cubeState.mirrorPosZ[c]);
+                if (d < bestDistZ) { bestDistZ = d; bestZ = c; }
+            }
+            curY = bestY;
+            curZ = bestZ;
+        } else {
+            // Block figure: standard grid spacing
+            curY = Math.round(cubie.position.y / unit) + 1;
+            curZ = Math.round(cubie.position.z / unit) + 1;
+        }
+
+        const curIndex = curY * 3 + curZ;
+        const ori = getFloppyOrientation(cubie.quaternion);
+        state[curIndex] = pieceId * 4 + ori;
+    });
+
+    return state;
+}
+
+function applyFloppyMove(state, moveIndex) {
+    const move = FLOPPY_MOVES[moveIndex];
+    const idx = move.indices;
+    const applyOri = move.applyOri;
+
+    // 180° swap: first and last swap, middle stays
+    const newState = state.slice();
+    // Swap positions of first and last in the row/col
+    newState[idx[0]] = state[idx[2]];
+    newState[idx[2]] = state[idx[0]];
+    // Middle stays in place (but orientation still changes)
+
+    // Apply orientation change to all three affected pieces
+    for (let i = 0; i < 3; i++) {
+        const val = newState[idx[i]];
+        const pid = Math.floor(val / 4);
+        const ori = val % 4;
+        newState[idx[i]] = pid * 4 + applyOri[ori];
+    }
+
+    return newState;
+}
+
+function solveFloppyCube() {
+    const startState = getFloppyState();
+    const isMirror = cubeState.figure === 'mirror';
+
+    // Goal check function
+    function isGoal(state) {
+        if (isMirror) {
+            // Mirror: only positions must match (ignore orientation)
+            for (let i = 0; i < 9; i++) {
+                if (Math.floor(state[i] / 4) !== i) return false;
+            }
+            return true;
+        } else {
+            // Block: positions AND orientations must match
+            for (let i = 0; i < 9; i++) {
+                if (state[i] !== i * 4) return false;
+            }
+            return true;
+        }
+    }
+
+    // State key for visited set
+    function stateKey(state) {
+        if (isMirror) {
+            // Position-only key
+            const parts = [];
+            for (let i = 0; i < 9; i++) parts.push(Math.floor(state[i] / 4));
+            return parts.join(',');
+        }
+        return state.join(',');
+    }
+
+    if (isGoal(startState)) return [];
+
+    // BFS
+    const visited = {};
+    const queue = [{ state: startState, moves: [] }];
+    visited[stateKey(startState)] = true;
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+
+        for (let m = 0; m < 6; m++) {
+            const newState = applyFloppyMove(current.state, m);
+            const key = stateKey(newState);
+
+            if (visited[key]) continue;
+            visited[key] = true;
+
+            const newMoves = current.moves.concat([m]);
+
+            if (isGoal(newState)) {
+                return newMoves.map(function(i) { return FLOPPY_MOVES[i].name; });
+            }
+
+            queue.push({ state: newState, moves: newMoves });
+        }
+    }
+
+    return null; // No solution found (shouldn't happen)
+}
+
+function solveFromHistory(onComplete) {
+    const reversedMoves = moveHistory.slice().reverse();
+    moveHistory = [];
+    isSolving = true;
+
+    let index = 0;
+    function next() {
+        if (index >= reversedMoves.length) {
+            isSolving = false;
+            if (onComplete) onComplete();
+            return;
+        }
+        const move = reversedMoves[index++];
+        if (move.type === 'pyraminx') {
+            rotatePyraminxLayer(move.face, !move.clockwise, move.wide, next);
+        } else {
+            rotateCubeLayer(move.face, !move.clockwise, next);
+        }
+    }
+    next();
+}
+
+function executeFloppySolution(moves, onComplete) {
+    if (!moves || moves.length === 0) {
+        if (onComplete) onComplete();
+        return;
+    }
+
+    let index = 0;
+    function executeNext() {
+        if (index >= moves.length) {
+            if (onComplete) onComplete();
+            return;
+        }
+        const face = moves[index++];
+        rotateCubeLayer(face, true, executeNext);
     }
 
     executeNext();
