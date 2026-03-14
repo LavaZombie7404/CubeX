@@ -139,7 +139,7 @@ function createSkewb() {
     var T = S / 3;
 
     // Dark body cube
-    var bodyGeom = new THREE.BoxGeometry(2 * S, 2 * S, 2 * S);
+    var bodyGeom = new THREE.BoxGeometry(2 * S * 0.95, 2 * S * 0.95, 2 * S * 0.95);
     var bodyMat = new THREE.MeshLambertMaterial({ color: SKEWB_COLORS.dark });
     skewbState.body = new THREE.Mesh(bodyGeom, bodyMat);
     skewbState.group.add(skewbState.body);
