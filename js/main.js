@@ -86,6 +86,7 @@ function setupPuzzleSelector() {
 
         skewbState.group = null;
         skewbState.pieces = [];
+        skewbState.body = null;
         skewbState.isAnimating = false;
         skewbState.animationQueue = [];
 

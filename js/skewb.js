@@ -2,46 +2,27 @@
 
 var skewbState = {
     group: null,
-    pieces: [],        // { type:'corner'|'center', id, cornerId/centerId, mesh }
+    pieces: [],        // { type:'corner'|'center', id, cornerId/centerId, meshes:[] }
+    body: null,
     isAnimating: false,
     animationQueue: []
 };
 
-var SKEWB_S = 0.6;   // half-size of the cube
+var SKEWB_S = 0.6;       // half-size of the cube
+var SKEWB_GAP = 0.015;   // gap between stickers
+var SKEWB_RAISE = 0.003; // sticker raise above body
 
 var SKEWB_COLORS = {
-    U: 0xffffff,    // white  (top)
-    D: 0xffff00,    // yellow (bottom)
-    F: 0xff0000,    // red    (front)
-    B: 0xffa500,    // orange (back)
-    L: 0x00ff00,    // green  (left)
-    R: 0x0000ff,    // blue   (right)
-    dark: 0x111111
+    U: 0xffffff,    // white
+    D: 0xffff00,    // yellow
+    F: 0xff0000,    // red
+    B: 0xffa500,    // orange
+    L: 0x00ff00,    // green
+    R: 0x0000ff,    // blue
+    dark: 0x222222
 };
 
-// The 8 corner positions of the cube
-var SKEWB_CORNERS = [
-    { id: 'FRU', pos: [ 1,  1,  1] },
-    { id: 'FLU', pos: [-1,  1,  1] },
-    { id: 'BRU', pos: [ 1,  1, -1] },
-    { id: 'BLU', pos: [-1,  1, -1] },
-    { id: 'FRD', pos: [ 1, -1,  1] },
-    { id: 'FLD', pos: [-1, -1,  1] },
-    { id: 'BRD', pos: [ 1, -1, -1] },
-    { id: 'BLD', pos: [-1, -1, -1] }
-];
-
-// The 6 center faces
-var SKEWB_CENTERS = [
-    { id: 'U', normal: [0, 1, 0], face: 'U' },
-    { id: 'D', normal: [0,-1, 0], face: 'D' },
-    { id: 'F', normal: [0, 0, 1], face: 'F' },
-    { id: 'B', normal: [0, 0,-1], face: 'B' },
-    { id: 'R', normal: [ 1, 0, 0], face: 'R' },
-    { id: 'L', normal: [-1, 0, 0], face: 'L' }
-];
-
-// Move definitions: each move rotates one half of the puzzle 120° around a body diagonal.
+// Move definitions: each move rotates one half (4 corners + 3 centers) 120° around a body diagonal.
 // corners[0] is the pivot corner.
 var SKEWB_MOVES = {
     R: {
@@ -66,157 +47,109 @@ var SKEWB_MOVES = {
     }
 };
 
-// Helper: add a triangle to the vertex array with correct winding for the given outward normal.
-function addTriWithNormal(verts, a, b, c, nx, ny, nz) {
-    // Compute (b-a) × (c-a)
-    var abx = b[0]-a[0], aby = b[1]-a[1], abz = b[2]-a[2];
-    var acx = c[0]-a[0], acy = c[1]-a[1], acz = c[2]-a[2];
-    var crossX = aby*acz - abz*acy;
-    var crossY = abz*acx - abx*acz;
-    var crossZ = abx*acy - aby*acx;
-    var dot = crossX*nx + crossY*ny + crossZ*nz;
-    if (dot >= 0) {
-        verts.push(a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2]);
-    } else {
-        verts.push(a[0],a[1],a[2], c[0],c[1],c[2], b[0],b[1],b[2]);
-    }
-}
+// Corner definitions: id, signs for position
+var SKEWB_CORNER_DEFS = [
+    { id: 'FRU', sx: 1, sy: 1, sz: 1 },
+    { id: 'FLU', sx:-1, sy: 1, sz: 1 },
+    { id: 'BRU', sx: 1, sy: 1, sz:-1 },
+    { id: 'BLU', sx:-1, sy: 1, sz:-1 },
+    { id: 'FRD', sx: 1, sy:-1, sz: 1 },
+    { id: 'FLD', sx:-1, sy:-1, sz: 1 },
+    { id: 'BRD', sx: 1, sy:-1, sz:-1 },
+    { id: 'BLD', sx:-1, sy:-1, sz:-1 }
+];
 
-// Build a corner piece mesh (tetrahedron at a cube corner).
-// 3 visible colored faces + 1 dark internal face.
-function createSkewbCorner(cornerDef) {
-    var S = SKEWB_S;
-    var T = 2 * S / 3;  // 1/3 of edge length (distance from corner to cut point)
-    var sx = cornerDef.pos[0];  // ±1
-    var sy = cornerDef.pos[1];
-    var sz = cornerDef.pos[2];
+// Center definitions
+var SKEWB_CENTER_DEFS = [
+    { id: 'U', nx: 0, ny: 1, nz: 0 },
+    { id: 'D', nx: 0, ny:-1, nz: 0 },
+    { id: 'F', nx: 0, ny: 0, nz: 1 },
+    { id: 'B', nx: 0, ny: 0, nz:-1 },
+    { id: 'R', nx: 1, ny: 0, nz: 0 },
+    { id: 'L', nx:-1, ny: 0, nz: 0 }
+];
 
-    // v0 = cube corner
-    var v0 = [sx*S, sy*S, sz*S];
-    // v1 = cut point along X edge
-    var v1 = [sx*S - sx*T, sy*S, sz*S];
-    // v2 = cut point along Y edge
-    var v2 = [sx*S, sy*S - sy*T, sz*S];
-    // v3 = cut point along Z edge
-    var v3 = [sx*S, sy*S, sz*S - sz*T];
-
-    var geometry = new THREE.BufferGeometry();
-    var vertices = [];
-    var groups = [];
-
-    // Face 0: Y-normal face (U or D) — triangle on v0, v1, v3 (all at y = sy*S)
-    addTriWithNormal(vertices, v0, v1, v3, 0, sy, 0);
-    groups.push({ start: 0, count: 3, materialIndex: 0 });
-
-    // Face 1: Z-normal face (F or B) — triangle on v0, v1, v2 (all at z = sz*S)
-    addTriWithNormal(vertices, v0, v1, v2, 0, 0, sz);
-    groups.push({ start: 3, count: 3, materialIndex: 1 });
-
-    // Face 2: X-normal face (R or L) — triangle on v0, v2, v3 (all at x = sx*S)
-    addTriWithNormal(vertices, v0, v2, v3, sx, 0, 0);
-    groups.push({ start: 6, count: 3, materialIndex: 2 });
-
-    // Face 3: Internal cut face — triangle v1, v2, v3
-    // Normal points inward (toward center of cube, which is origin)
-    var cx = (v1[0]+v2[0]+v3[0])/3;
-    var cy = (v1[1]+v2[1]+v3[1])/3;
-    var cz = (v1[2]+v2[2]+v3[2])/3;
-    addTriWithNormal(vertices, v1, v2, v3, -cx, -cy, -cz);
-    groups.push({ start: 9, count: 3, materialIndex: 3 });
-
-    var posArray = new Float32Array(vertices);
-    geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-    geometry.computeVertexNormals();
-
-    geometry.clearGroups();
-    for (var g = 0; g < groups.length; g++) {
-        geometry.addGroup(groups[g].start, groups[g].count, groups[g].materialIndex);
-    }
-
-    var yFace = sy > 0 ? 'U' : 'D';
-    var zFace = sz > 0 ? 'F' : 'B';
-    var xFace = sx > 0 ? 'R' : 'L';
-
-    var materials = [
-        new THREE.MeshLambertMaterial({ color: SKEWB_COLORS[yFace], side: THREE.DoubleSide }),
-        new THREE.MeshLambertMaterial({ color: SKEWB_COLORS[zFace], side: THREE.DoubleSide }),
-        new THREE.MeshLambertMaterial({ color: SKEWB_COLORS[xFace], side: THREE.DoubleSide }),
-        new THREE.MeshLambertMaterial({ color: SKEWB_COLORS.dark, side: THREE.DoubleSide })
-    ];
-
-    var mesh = new THREE.Mesh(geometry, materials);
-
-    var edgesGeo = new THREE.EdgesGeometry(geometry, 20);
-    var edgesMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-    mesh.add(new THREE.LineSegments(edgesGeo, edgesMat));
-
-    return mesh;
-}
-
-// Build a center piece mesh (octagon on a cube face).
-function createSkewbCenter(centerDef) {
-    var S = SKEWB_S;
-    var T = S / 3;
-    var face = centerDef.face;
-    var n = centerDef.normal;
-
-    // The center piece is an octagon on the face, formed by the 8 cut points.
-    // For each face, the octagon vertices lie on the face plane.
-    var octVerts;
-    if (face === 'U') {
-        octVerts = [
-            [ T, S, S], [ S, S, T], [ S, S,-T], [ T, S,-S],
-            [-T, S,-S], [-S, S,-T], [-S, S, T], [-T, S, S]
-        ];
-    } else if (face === 'D') {
-        octVerts = [
-            [ T,-S, S], [ S,-S, T], [ S,-S,-T], [ T,-S,-S],
-            [-T,-S,-S], [-S,-S,-T], [-S,-S, T], [-T,-S, S]
-        ];
-    } else if (face === 'F') {
-        octVerts = [
-            [ T, S, S], [ S, T, S], [ S,-T, S], [ T,-S, S],
-            [-T,-S, S], [-S,-T, S], [-S, T, S], [-T, S, S]
-        ];
-    } else if (face === 'B') {
-        octVerts = [
-            [-T, S,-S], [-S, T,-S], [-S,-T,-S], [-T,-S,-S],
-            [ T,-S,-S], [ S,-T,-S], [ S, T,-S], [ T, S,-S]
-        ];
-    } else if (face === 'R') {
-        octVerts = [
-            [S, T, S], [S, S, T], [S, S,-T], [S, T,-S],
-            [S,-T,-S], [S,-S,-T], [S,-S, T], [S,-T, S]
-        ];
-    } else { // L
-        octVerts = [
-            [-S, T, S], [-S, S, T], [-S, S,-T], [-S, T,-S],
-            [-S,-T,-S], [-S,-S,-T], [-S,-S, T], [-S,-T, S]
-        ];
-    }
-
-    // Fan-triangulate from the face center
-    var fc = [n[0]*S, n[1]*S, n[2]*S];
+// Create a flat colored sticker mesh from an array of 3D points.
+// Points should be coplanar and in order around the polygon.
+// Normal is provided to ensure correct face orientation.
+function createStickerMesh(points, color, nx, ny, nz) {
     var geometry = new THREE.BufferGeometry();
     var vertices = [];
 
-    for (var i = 0; i < 8; i++) {
-        var next = (i + 1) % 8;
-        addTriWithNormal(vertices, fc, octVerts[i], octVerts[next], n[0], n[1], n[2]);
+    // Fan triangulation from first vertex
+    for (var i = 1; i < points.length - 1; i++) {
+        var a = points[0], b = points[i], c = points[i + 1];
+        // Check winding
+        var abx = b[0]-a[0], aby = b[1]-a[1], abz = b[2]-a[2];
+        var acx = c[0]-a[0], acy = c[1]-a[1], acz = c[2]-a[2];
+        var cx = aby*acz - abz*acy;
+        var cy = abz*acx - abx*acz;
+        var cz = abx*acy - aby*acx;
+        var dot = cx*nx + cy*ny + cz*nz;
+        if (dot >= 0) {
+            vertices.push(a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2]);
+        } else {
+            vertices.push(a[0],a[1],a[2], c[0],c[1],c[2], b[0],b[1],b[2]);
+        }
     }
 
     var posArray = new Float32Array(vertices);
     geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     geometry.computeVertexNormals();
 
-    var material = new THREE.MeshLambertMaterial({ color: SKEWB_COLORS[face], side: THREE.DoubleSide });
+    var material = new THREE.MeshLambertMaterial({ color: color, side: THREE.DoubleSide });
     var mesh = new THREE.Mesh(geometry, material);
 
-    var edgesGeo = new THREE.EdgesGeometry(geometry, 20);
+    var edgesGeo = new THREE.EdgesGeometry(geometry, 10);
     var edgesMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
     mesh.add(new THREE.LineSegments(edgesGeo, edgesMat));
 
     return mesh;
+}
+
+// Shrink polygon points toward centroid by gap amount
+function shrinkPolygon(points, gap) {
+    var cx = 0, cy = 0, cz = 0;
+    for (var i = 0; i < points.length; i++) {
+        cx += points[i][0]; cy += points[i][1]; cz += points[i][2];
+    }
+    cx /= points.length; cy /= points.length; cz /= points.length;
+
+    var result = [];
+    for (var i = 0; i < points.length; i++) {
+        var dx = points[i][0] - cx, dy = points[i][1] - cy, dz = points[i][2] - cz;
+        var len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        if (len < 0.001) {
+            result.push([points[i][0], points[i][1], points[i][2]]);
+        } else {
+            var shrink = Math.max(0, len - gap) / len;
+            result.push([cx + dx*shrink, cy + dy*shrink, cz + dz*shrink]);
+        }
+    }
+    return result;
+}
+
+// Raise polygon points along the face normal
+function raisePolygon(points, nx, ny, nz, amount) {
+    var result = [];
+    for (var i = 0; i < points.length; i++) {
+        result.push([
+            points[i][0] + nx * amount,
+            points[i][1] + ny * amount,
+            points[i][2] + nz * amount
+        ]);
+    }
+    return result;
+}
+
+// Get the face color name for a given axis direction
+function getFaceFromNormal(nx, ny, nz) {
+    if (ny > 0.5) return 'U';
+    if (ny < -0.5) return 'D';
+    if (nz > 0.5) return 'F';
+    if (nz < -0.5) return 'B';
+    if (nx > 0.5) return 'R';
+    return 'L';
 }
 
 function createSkewb() {
@@ -225,26 +158,115 @@ function createSkewb() {
     skewbState.isAnimating = false;
     skewbState.animationQueue = [];
 
+    var S = SKEWB_S;
+    var T = S / 3; // cut point: 1/3 of edge from corner
+
+    // Dark body cube
+    var bodyGeom = new THREE.BoxGeometry(2 * S, 2 * S, 2 * S);
+    var bodyMat = new THREE.MeshLambertMaterial({ color: SKEWB_COLORS.dark });
+    skewbState.body = new THREE.Mesh(bodyGeom, bodyMat);
+    skewbState.group.add(skewbState.body);
+
     var idCounter = 0;
 
-    // Create 8 corner pieces
-    for (var i = 0; i < SKEWB_CORNERS.length; i++) {
-        var def = SKEWB_CORNERS[i];
-        var mesh = createSkewbCorner(def);
+    // ---- Create 8 corner pieces ----
+    // Each corner piece has 3 triangular stickers (one per adjacent face).
+    for (var ci = 0; ci < SKEWB_CORNER_DEFS.length; ci++) {
+        var cd = SKEWB_CORNER_DEFS[ci];
+        var meshes = [];
+
+        // The cube corner position
+        var cx = cd.sx * S, cy = cd.sy * S, cz = cd.sz * S;
+
+        // Cut points: 1/3 along each edge from the corner
+        var vx = [cx - cd.sx * 2 * T, cy, cz]; // moved along X edge
+        var vy = [cx, cy - cd.sy * 2 * T, cz]; // moved along Y edge
+        var vz = [cx, cy, cz - cd.sz * 2 * T]; // moved along Z edge
+
+        // Y-normal face sticker (U or D)
+        var yPts = [[cx, cy, cz], vx, vz];
+        var yFace = getFaceFromNormal(0, cd.sy, 0);
+        yPts = shrinkPolygon(yPts, SKEWB_GAP);
+        yPts = raisePolygon(yPts, 0, cd.sy, 0, SKEWB_RAISE);
+        meshes.push(createStickerMesh(yPts, SKEWB_COLORS[yFace], 0, cd.sy, 0));
+
+        // Z-normal face sticker (F or B)
+        var zPts = [[cx, cy, cz], vx, vy];
+        var zFace = getFaceFromNormal(0, 0, cd.sz);
+        zPts = shrinkPolygon(zPts, SKEWB_GAP);
+        zPts = raisePolygon(zPts, 0, 0, cd.sz, SKEWB_RAISE);
+        meshes.push(createStickerMesh(zPts, SKEWB_COLORS[zFace], 0, 0, cd.sz));
+
+        // X-normal face sticker (R or L)
+        var xPts = [[cx, cy, cz], vy, vz];
+        var xFace = getFaceFromNormal(cd.sx, 0, 0);
+        xPts = shrinkPolygon(xPts, SKEWB_GAP);
+        xPts = raisePolygon(xPts, cd.sx, 0, 0, SKEWB_RAISE);
+        meshes.push(createStickerMesh(xPts, SKEWB_COLORS[xFace], cd.sx, 0, 0));
+
+        // Add all meshes to group
+        for (var m = 0; m < meshes.length; m++) {
+            skewbState.group.add(meshes[m]);
+        }
+
         skewbState.pieces.push({
-            type: 'corner', id: idCounter++, cornerId: def.id, mesh: mesh
+            type: 'corner', id: idCounter++, cornerId: cd.id, meshes: meshes
         });
-        skewbState.group.add(mesh);
     }
 
-    // Create 6 center pieces
-    for (var i = 0; i < SKEWB_CENTERS.length; i++) {
-        var def = SKEWB_CENTERS[i];
-        var mesh = createSkewbCenter(def);
-        skewbState.pieces.push({
-            type: 'center', id: idCounter++, centerId: def.id, mesh: mesh
-        });
+    // ---- Create 6 center pieces ----
+    // Each center piece is an octagonal sticker on a cube face.
+    for (var fi = 0; fi < SKEWB_CENTER_DEFS.length; fi++) {
+        var fd = SKEWB_CENTER_DEFS[fi];
+        var face = fd.id;
+        var nx = fd.nx, ny = fd.ny, nz = fd.nz;
+
+        // Build octagon vertices on this face.
+        // The center octagon is bounded by 4 cut lines, one from each face corner.
+        // Each cut line connects two 1/3-points on adjacent edges.
+        // The octagon has 8 vertices: 2 per face edge (one from each corner).
+        var octPts;
+        if (face === 'U') {
+            octPts = [
+                [T,S,S], [S,S,T], [S,S,-T], [T,S,-S],
+                [-T,S,-S], [-S,S,-T], [-S,S,T], [-T,S,S]
+            ];
+        } else if (face === 'D') {
+            octPts = [
+                [T,-S,S], [S,-S,T], [S,-S,-T], [T,-S,-S],
+                [-T,-S,-S], [-S,-S,-T], [-S,-S,T], [-T,-S,S]
+            ];
+        } else if (face === 'F') {
+            octPts = [
+                [T,S,S], [S,T,S], [S,-T,S], [T,-S,S],
+                [-T,-S,S], [-S,-T,S], [-S,T,S], [-T,S,S]
+            ];
+        } else if (face === 'B') {
+            octPts = [
+                [-T,S,-S], [-S,T,-S], [-S,-T,-S], [-T,-S,-S],
+                [T,-S,-S], [S,-T,-S], [S,T,-S], [T,S,-S]
+            ];
+        } else if (face === 'R') {
+            octPts = [
+                [S,T,S], [S,S,T], [S,S,-T], [S,T,-S],
+                [S,-T,-S], [S,-S,-T], [S,-S,T], [S,-T,S]
+            ];
+        } else { // L
+            octPts = [
+                [-S,T,S], [-S,S,T], [-S,S,-T], [-S,T,-S],
+                [-S,-T,-S], [-S,-S,-T], [-S,-S,T], [-S,-T,S]
+            ];
+        }
+
+        octPts = shrinkPolygon(octPts, SKEWB_GAP);
+        octPts = raisePolygon(octPts, nx, ny, nz, SKEWB_RAISE);
+
+        var mesh = createStickerMesh(octPts, SKEWB_COLORS[face], nx, ny, nz);
         skewbState.group.add(mesh);
+
+        skewbState.pieces.push({
+            type: 'center', id: idCounter++, centerId: fd.id, meshes: [mesh]
+        });
     }
 
     return skewbState.group;
@@ -283,11 +305,17 @@ function rotateSkewbMove(moveName, clockwise, onComplete) {
 
     var movePieces = getMovePieces(moveName);
 
+    // Collect all meshes for the moving pieces
+    var allMeshes = [];
     var startPositions = [];
     var startQuaternions = [];
     for (var i = 0; i < movePieces.length; i++) {
-        startPositions.push(movePieces[i].mesh.position.clone());
-        startQuaternions.push(movePieces[i].mesh.quaternion.clone());
+        for (var j = 0; j < movePieces[i].meshes.length; j++) {
+            var mesh = movePieces[i].meshes[j];
+            allMeshes.push(mesh);
+            startPositions.push(mesh.position.clone());
+            startQuaternions.push(mesh.quaternion.clone());
+        }
     }
 
     var duration = 300;
@@ -304,9 +332,9 @@ function rotateSkewbMove(moveName, clockwise, onComplete) {
         var rotQuat = new THREE.Quaternion();
         rotQuat.setFromAxisAngle(axisVec, currentAngle);
 
-        for (var i = 0; i < movePieces.length; i++) {
-            movePieces[i].mesh.position.copy(startPositions[i]).applyQuaternion(rotQuat);
-            movePieces[i].mesh.quaternion.copy(startQuaternions[i]).premultiply(rotQuat);
+        for (var i = 0; i < allMeshes.length; i++) {
+            allMeshes[i].position.copy(startPositions[i]).applyQuaternion(rotQuat);
+            allMeshes[i].quaternion.copy(startQuaternions[i]).premultiply(rotQuat);
         }
 
         if (progress < 1) {
@@ -328,21 +356,21 @@ function updatePieceIds(moveName, clockwise) {
     var cycleCornerIds = [moveDef.corners[1], moveDef.corners[2], moveDef.corners[3]];
     var cycleCenterIds = [moveDef.centers[0], moveDef.centers[1], moveDef.centers[2]];
 
-    function findPieceByCorner(id) {
+    function findByCorner(id) {
         for (var j = 0; j < skewbState.pieces.length; j++) {
             if (skewbState.pieces[j].cornerId === id) return skewbState.pieces[j];
         }
         return null;
     }
-    function findPieceByCenter(id) {
+    function findByCenter(id) {
         for (var j = 0; j < skewbState.pieces.length; j++) {
             if (skewbState.pieces[j].centerId === id) return skewbState.pieces[j];
         }
         return null;
     }
 
-    var cp = [findPieceByCorner(cycleCornerIds[0]), findPieceByCorner(cycleCornerIds[1]), findPieceByCorner(cycleCornerIds[2])];
-    var cep = [findPieceByCenter(cycleCenterIds[0]), findPieceByCenter(cycleCenterIds[1]), findPieceByCenter(cycleCenterIds[2])];
+    var cp = [findByCorner(cycleCornerIds[0]), findByCorner(cycleCornerIds[1]), findByCorner(cycleCornerIds[2])];
+    var cep = [findByCenter(cycleCenterIds[0]), findByCenter(cycleCenterIds[1]), findByCenter(cycleCenterIds[2])];
 
     if (clockwise) {
         var t1 = cp[2].cornerId; cp[2].cornerId = cp[1].cornerId; cp[1].cornerId = cp[0].cornerId; cp[0].cornerId = t1;
