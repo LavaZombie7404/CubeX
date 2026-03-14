@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setupPyraminxControls();
     setupCubeControls();
-    setupSQ1Controls();
+    setupSkewbControls();
     setupMoveButtons();
     setupPuzzleSelector();
     setupCuboidButtons();
@@ -54,7 +54,7 @@ function setupPuzzleSelector() {
     const cubeMoves = document.getElementById('cube-moves');
     const cuboidMoves = document.getElementById('cuboid-moves');
     const floppyMoves = document.getElementById('floppy-moves');
-    const sq1Moves = document.getElementById('sq1-moves');
+    const skewbMoves = document.getElementById('skewb-moves');
     const diagramPanel = document.getElementById('diagram-panel');
     const figureSection = document.getElementById('figure-section');
     const figureSelect = document.getElementById('figure-select');
@@ -84,11 +84,10 @@ function setupPuzzleSelector() {
         cubeState.isAnimating = false;
         cubeState.animationQueue = [];
 
-        sq1State.group = null;
-        sq1State.pieces = [];
-        sq1State.middleMeshes = [];
-        sq1State.isAnimating = false;
-        sq1State.animationQueue = [];
+        skewbState.group = null;
+        skewbState.pieces = [];
+        skewbState.isAnimating = false;
+        skewbState.animationQueue = [];
 
         // Create new puzzle
         if (puzzle === 'pyraminx') {
@@ -97,7 +96,7 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
-            sq1Moves.style.display = 'none';
+            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
@@ -112,7 +111,7 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
-            sq1Moves.style.display = 'none';
+            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'none';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
@@ -124,7 +123,7 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'flex';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
-            sq1Moves.style.display = 'none';
+            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
@@ -137,7 +136,7 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'flex';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
-            sq1Moves.style.display = 'none';
+            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
@@ -151,7 +150,7 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'flex';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
-            sq1Moves.style.display = 'none';
+            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
@@ -166,7 +165,7 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'flex';
-            sq1Moves.style.display = 'none';
+            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'block';
@@ -181,7 +180,7 @@ function setupPuzzleSelector() {
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'flex';
             floppyMoves.style.display = 'none';
-            sq1Moves.style.display = 'none';
+            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'block';
             floppyFigureSection.style.display = 'none';
@@ -191,13 +190,13 @@ function setupPuzzleSelector() {
             updateCuboidMoveButtons(currentFigure);
             // Clear diagram for cuboid (no diagram yet)
             clearDiagram();
-        } else if (puzzle === 'sq1') {
-            currentPuzzleGroup = createSquareOne();
+        } else if (puzzle === 'skewb') {
+            currentPuzzleGroup = createSkewb();
             pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'none';
-            sq1Moves.style.display = 'flex';
+            skewbMoves.style.display = 'flex';
             diagramPanel.style.display = 'none';
             figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'none';
@@ -237,19 +236,13 @@ function setupMoveButtons() {
         });
     });
 
-    // SQ-1 buttons
-    const sq1Buttons = document.querySelectorAll('#sq1-moves .sq1-btn');
-    sq1Buttons.forEach(btn => {
+    // Skewb buttons
+    const skewbButtons = document.querySelectorAll('#skewb-moves .skewb-btn');
+    skewbButtons.forEach(btn => {
         btn.addEventListener('click', function() {
             const move = this.dataset.move;
-            const amount = parseInt(this.dataset.amount);
-            if (move === 'slice') {
-                if (canSliceSQ1()) {
-                    sliceSQ1();
-                }
-            } else {
-                rotateSQ1Layer(move, amount);
-            }
+            const clockwise = this.dataset.cw === 'true';
+            rotateSkewbMove(move, clockwise);
         });
     });
 }
@@ -409,8 +402,8 @@ function setupScrambleButton() {
             scramblePyraminx(15, onComplete);
         } else if (currentPuzzle === 'floppy') {
             scrambleFloppyCube(10, onComplete);
-        } else if (currentPuzzle === 'sq1') {
-            scrambleSQ1(20, onComplete);
+        } else if (currentPuzzle === 'skewb') {
+            scrambleSkewb(15, onComplete);
         } else if (currentPuzzle.startsWith('cube') || currentPuzzle.startsWith('cuboid')) {
             scrambleCube(null, onComplete);
         }
@@ -453,7 +446,7 @@ function setupSolveButton() {
     const solveBtn = document.getElementById('solve-btn');
 
     solveBtn.addEventListener('click', function() {
-        if (cubeState.isAnimating || pyraminxState.isAnimating || sq1State.isAnimating) return;
+        if (cubeState.isAnimating || pyraminxState.isAnimating || skewbState.isAnimating) return;
 
         solveBtn.disabled = true;
         solveBtn.textContent = 'Solving...';

@@ -1354,12 +1354,8 @@ function solveFromHistory(onComplete) {
         const move = reversedMoves[index++];
         if (move.type === 'pyraminx') {
             rotatePyraminxLayer(move.face, !move.clockwise, move.wide, next);
-        } else if (move.type === 'sq1') {
-            if (move.move === 'slice') {
-                sliceSQ1(next);
-            } else {
-                rotateSQ1Layer(move.move, -move.amount, next);
-            }
+        } else if (move.type === 'skewb') {
+            rotateSkewbMove(move.move, !move.clockwise, next);
         } else {
             rotateCubeLayer(move.face, !move.clockwise, next);
         }

@@ -31,7 +31,7 @@ CubeX is a browser-based 3D simulator for twisty puzzles. It renders interactive
 |:-------|:-----------------|
 | **NxN Cubes** | 1x1, 2x2, 3x3, 4x4, 5x5, 6x6, 7x7 |
 | **Pyraminx** | Standard tetrahedral puzzle |
-| **Square-1** | Shape-shifting with slice mechanics |
+| **Skewb** | Corner-turning cube puzzle |
 | **1x3x3 Floppy Cube** | Block & mirror figures |
 | **1x2x3 Cuboid** | Block, tree & mirror figures |
 
@@ -55,7 +55,7 @@ CubeX is a browser-based 3D simulator for twisty puzzles. It renders interactive
 | `Ctrl` + digit + move | Inner slice at a specific depth (4x4+) |
 | Mouse drag | Orbit the camera |
 | Scroll wheel | Zoom in / out |
-| `/` | Slice move (Square-1) |
+| `R` `L` `U` `B` | Skewb corner turns (Shift for inverse) |
 
 ## Tech Stack
 
@@ -77,7 +77,7 @@ CubeX/
 │   ├── main.js       # UI setup, puzzle switching, scramble/solve
 │   ├── cube.js       # All NxN cubes, floppy, cuboid logic & solver
 │   ├── pyraminx.js   # Tetrahedral puzzle mechanics
-│   ├── sq1.js        # Square-1 geometry & slice rules
+│   ├── skewb.js      # Skewb puzzle mechanics & geometry
 │   ├── diagram.js    # 2D net & circular diagram rendering
 │   ├── camera.js     # Webcam capture & HSV color detection
 │   └── scene.js      # Three.js scene, lights & render loop
