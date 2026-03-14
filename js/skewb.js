@@ -77,7 +77,7 @@ function createStickerMesh(points, color, nx, ny, nz) {
     geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     geometry.computeVertexNormals();
 
-    var material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide });
+    var material = new THREE.MeshLambertMaterial({ color: color, side: THREE.DoubleSide });
     var mesh = new THREE.Mesh(geometry, material);
 
     var edgesGeo = new THREE.EdgesGeometry(geometry, 10);
@@ -136,7 +136,7 @@ function createSkewb() {
     skewbState.animationQueue = [];
 
     var S = SKEWB_S;
-    var T = S / 3;
+    var T = S / 2;
 
     // Dark body cube
     var bodyGeom = new THREE.BoxGeometry(2 * S * 0.95, 2 * S * 0.95, 2 * S * 0.95);
@@ -174,8 +174,6 @@ function createSkewb() {
         var xPts = raisePolygon(shrinkPolygon([v0, vy, vz], SKEWB_GAP), cd.sx, 0, 0, SKEWB_RAISE);
         meshes.push(createStickerMesh(xPts, xColor, cd.sx, 0, 0));
 
-        console.log('Corner', ci, 'colors: Y=0x'+yColor.toString(16), 'Z=0x'+zColor.toString(16), 'X=0x'+xColor.toString(16));
-
         // Internal cut face: vx, vy, vz
         meshes.push(createStickerMesh([vx, vy, vz], SKEWB_COLORS.dark, -cd.sx, -cd.sy, -cd.sz));
 
@@ -197,17 +195,17 @@ function createSkewb() {
 
         var octPts;
         if (fd.id === 'U') {
-            octPts = [[T,S,S],[S,S,T],[S,S,-T],[T,S,-S],[-T,S,-S],[-S,S,-T],[-S,S,T],[-T,S,S]];
+            octPts = [[0,S,S],[S,S,0],[0,S,-S],[-S,S,0]];
         } else if (fd.id === 'D') {
-            octPts = [[T,-S,S],[S,-S,T],[S,-S,-T],[T,-S,-S],[-T,-S,-S],[-S,-S,-T],[-S,-S,T],[-T,-S,S]];
+            octPts = [[0,-S,S],[S,-S,0],[0,-S,-S],[-S,-S,0]];
         } else if (fd.id === 'F') {
-            octPts = [[T,S,S],[S,T,S],[S,-T,S],[T,-S,S],[-T,-S,S],[-S,-T,S],[-S,T,S],[-T,S,S]];
+            octPts = [[0,S,S],[S,0,S],[0,-S,S],[-S,0,S]];
         } else if (fd.id === 'B') {
-            octPts = [[-T,S,-S],[-S,T,-S],[-S,-T,-S],[-T,-S,-S],[T,-S,-S],[S,-T,-S],[S,T,-S],[T,S,-S]];
+            octPts = [[0,S,-S],[-S,0,-S],[0,-S,-S],[S,0,-S]];
         } else if (fd.id === 'R') {
-            octPts = [[S,T,S],[S,S,T],[S,S,-T],[S,T,-S],[S,-T,-S],[S,-S,-T],[S,-S,T],[S,-T,S]];
+            octPts = [[S,S,0],[S,0,S],[S,-S,0],[S,0,-S]];
         } else {
-            octPts = [[-S,T,S],[-S,S,T],[-S,S,-T],[-S,T,-S],[-S,-T,-S],[-S,-S,-T],[-S,-S,T],[-S,-T,S]];
+            octPts = [[-S,S,0],[-S,0,S],[-S,-S,0],[-S,0,-S]];
         }
 
         octPts = shrinkPolygon(octPts, SKEWB_GAP);
