@@ -156,20 +156,31 @@ function createSkewb() {
         var vy = [cx, cy - cd.sy * 2 * T, cz];
         var vz = [cx, cy, cz - cd.sz * 2 * T];
 
+        // The tip vertex is raised along the corner diagonal so all 3 stickers meet
+        var diag = Math.sqrt(3);
+        var tip = [cx + cd.sx * SKEWB_RAISE / diag, cy + cd.sy * SKEWB_RAISE / diag, cz + cd.sz * SKEWB_RAISE / diag];
+
+        // For each sticker, the cut-point vertices are shrunk slightly inward
+        // on the face and raised along the face normal
+        var G = SKEWB_GAP;
+
         // Y-normal face sticker (U or D)
-        var yPts = shrinkPolygon([[cx, cy, cz], vx, vz], SKEWB_GAP);
-        yPts = raisePolygon(yPts, 0, cd.sy, 0, SKEWB_RAISE);
-        meshes.push(createStickerMesh(yPts, SKEWB_COLORS[getFaceColor(0, cd.sy, 0)], 0, cd.sy, 0));
+        var yv1 = [vx[0] + (cx - vx[0]) * G / S, cy + cd.sy * SKEWB_RAISE, vx[2]];
+        var yv2 = [vz[0], cy + cd.sy * SKEWB_RAISE, vz[2] + (cx > 0 ? -1 : 1) * 0 + (cz - vz[2]) * G / S];
+        // Simpler: just shrink cut points toward tip on the face, then raise
+        var yvx = [vx[0] + (cx - vx[0]) * 0.05, vx[1] + cd.sy * SKEWB_RAISE, vx[2] + (cz - vx[2]) * 0.05];
+        var yvz = [vz[0] + (cx - vz[0]) * 0.05, vz[1] + cd.sy * SKEWB_RAISE, vz[2] + (cz - vz[2]) * 0.05];
+        meshes.push(createStickerMesh([tip, yvx, yvz], SKEWB_COLORS[getFaceColor(0, cd.sy, 0)], 0, cd.sy, 0));
 
         // Z-normal face sticker (F or B)
-        var zPts = shrinkPolygon([[cx, cy, cz], vx, vy], SKEWB_GAP);
-        zPts = raisePolygon(zPts, 0, 0, cd.sz, SKEWB_RAISE);
-        meshes.push(createStickerMesh(zPts, SKEWB_COLORS[getFaceColor(0, 0, cd.sz)], 0, 0, cd.sz));
+        var zvx = [vx[0] + (cx - vx[0]) * 0.05, vx[1] + (cy - vx[1]) * 0.05, vx[2] + cd.sz * SKEWB_RAISE];
+        var zvy = [vy[0] + (cx - vy[0]) * 0.05, vy[1] + (cy - vy[1]) * 0.05, vy[2] + cd.sz * SKEWB_RAISE];
+        meshes.push(createStickerMesh([tip, zvx, zvy], SKEWB_COLORS[getFaceColor(0, 0, cd.sz)], 0, 0, cd.sz));
 
         // X-normal face sticker (R or L)
-        var xPts = shrinkPolygon([[cx, cy, cz], vy, vz], SKEWB_GAP);
-        xPts = raisePolygon(xPts, cd.sx, 0, 0, SKEWB_RAISE);
-        meshes.push(createStickerMesh(xPts, SKEWB_COLORS[getFaceColor(cd.sx, 0, 0)], cd.sx, 0, 0));
+        var xvy = [vy[0] + cd.sx * SKEWB_RAISE, vy[1] + (cy - vy[1]) * 0.05, vy[2] + (cz - vy[2]) * 0.05];
+        var xvz = [vz[0] + cd.sx * SKEWB_RAISE, vz[1] + (cy - vz[1]) * 0.05, vz[2] + (cz - vz[2]) * 0.05];
+        meshes.push(createStickerMesh([tip, xvy, xvz], SKEWB_COLORS[getFaceColor(cd.sx, 0, 0)], cd.sx, 0, 0));
 
         for (var m = 0; m < meshes.length; m++) {
             skewbState.group.add(meshes[m]);
