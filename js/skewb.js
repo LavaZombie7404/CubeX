@@ -147,9 +147,11 @@ function createSkewb() {
     var idCounter = 0;
 
     // ---- Create 8 corner pieces ----
-    // Each corner is a solid tetrahedron: 3 colored faces + 1 dark internal face.
+    // Each corner has 3 colored face stickers + 1 dark internal face.
+    // All share the cube corner vertex so tips are fully colored.
     for (var ci = 0; ci < SKEWB_CORNER_DEFS.length; ci++) {
         var cd = SKEWB_CORNER_DEFS[ci];
+        var meshes = [];
 
         var cx = cd.sx * S, cy = cd.sy * S, cz = cd.sz * S;
         var vx = [cx - cd.sx * 2 * T, cy, cz];
@@ -157,61 +159,17 @@ function createSkewb() {
         var vz = [cx, cy, cz - cd.sz * 2 * T];
         var v0 = [cx, cy, cz];
 
-        // Build solid tetrahedron with 4 faces
-        var geometry = new THREE.BufferGeometry();
-        var vertices = [];
-        var groups = [];
+        // Y-normal face (U/D): v0, vx, vz — all at y = cy
+        meshes.push(createStickerMesh([v0, vx, vz], SKEWB_COLORS[getFaceColor(0, cd.sy, 0)], 0, cd.sy, 0));
 
-        // Helper: add triangle with correct winding for given normal
-        function addTri(verts, a, b, c, nnx, nny, nnz) {
-            var abx=b[0]-a[0], aby=b[1]-a[1], abz=b[2]-a[2];
-            var acx=c[0]-a[0], acy=c[1]-a[1], acz=c[2]-a[2];
-            var crx=aby*acz-abz*acy, cry=abz*acx-abx*acz, crz=abx*acy-aby*acx;
-            if (crx*nnx+cry*nny+crz*nnz >= 0) {
-                verts.push(a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2]);
-            } else {
-                verts.push(a[0],a[1],a[2],c[0],c[1],c[2],b[0],b[1],b[2]);
-            }
-        }
+        // Z-normal face (F/B): v0, vx, vy — all at z = cz
+        meshes.push(createStickerMesh([v0, vx, vy], SKEWB_COLORS[getFaceColor(0, 0, cd.sz)], 0, 0, cd.sz));
 
-        // Face 0: Y-normal (U/D) — v0, vx, vz
-        addTri(vertices, v0, vx, vz, 0, cd.sy, 0);
-        groups.push({ start: 0, count: 3, materialIndex: 0 });
+        // X-normal face (R/L): v0, vy, vz — all at x = cx
+        meshes.push(createStickerMesh([v0, vy, vz], SKEWB_COLORS[getFaceColor(cd.sx, 0, 0)], cd.sx, 0, 0));
 
-        // Face 1: Z-normal (F/B) — v0, vx, vy
-        addTri(vertices, v0, vx, vy, 0, 0, cd.sz);
-        groups.push({ start: 3, count: 3, materialIndex: 1 });
-
-        // Face 2: X-normal (R/L) — v0, vy, vz
-        addTri(vertices, v0, vy, vz, cd.sx, 0, 0);
-        groups.push({ start: 6, count: 3, materialIndex: 2 });
-
-        // Face 3: internal cut face — vx, vy, vz (normal toward cube center)
-        addTri(vertices, vx, vy, vz, -cd.sx, -cd.sy, -cd.sz);
-        groups.push({ start: 9, count: 3, materialIndex: 3 });
-
-        var posArray = new Float32Array(vertices);
-        geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        geometry.computeVertexNormals();
-        geometry.clearGroups();
-        for (var g = 0; g < groups.length; g++) {
-            geometry.addGroup(groups[g].start, groups[g].count, groups[g].materialIndex);
-        }
-
-        var materials = [
-            new THREE.MeshLambertMaterial({ color: SKEWB_COLORS[getFaceColor(0, cd.sy, 0)], side: THREE.DoubleSide }),
-            new THREE.MeshLambertMaterial({ color: SKEWB_COLORS[getFaceColor(0, 0, cd.sz)], side: THREE.DoubleSide }),
-            new THREE.MeshLambertMaterial({ color: SKEWB_COLORS[getFaceColor(cd.sx, 0, 0)], side: THREE.DoubleSide }),
-            new THREE.MeshLambertMaterial({ color: SKEWB_COLORS.dark, side: THREE.DoubleSide })
-        ];
-
-        var mesh = new THREE.Mesh(geometry, materials);
-        var edgesGeo = new THREE.EdgesGeometry(geometry, 20);
-        var edgesMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-        mesh.add(new THREE.LineSegments(edgesGeo, edgesMat));
-
-        skewbState.group.add(mesh);
-        var meshes = [mesh];
+        // Internal cut face: vx, vy, vz
+        meshes.push(createStickerMesh([vx, vy, vz], SKEWB_COLORS.dark, -cd.sx, -cd.sy, -cd.sz));
 
         for (var m = 0; m < meshes.length; m++) {
             skewbState.group.add(meshes[m]);
