@@ -10,7 +10,7 @@ var skewbState = {
 
 var SKEWB_S = 0.6;
 var SKEWB_GAP = 0.015;
-var SKEWB_RAISE = 0.003;
+var SKEWB_RAISE = 0.01;
 
 var SKEWB_COLORS = {
     U: 0xffffff,
@@ -77,7 +77,7 @@ function createStickerMesh(points, color, nx, ny, nz) {
     geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     geometry.computeVertexNormals();
 
-    var material = new THREE.MeshLambertMaterial({ color: color, side: THREE.DoubleSide });
+    var material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide });
     var mesh = new THREE.Mesh(geometry, material);
 
     var edgesGeo = new THREE.EdgesGeometry(geometry, 10);
@@ -140,7 +140,7 @@ function createSkewb() {
 
     // Dark body cube
     var bodyGeom = new THREE.BoxGeometry(2 * S * 0.95, 2 * S * 0.95, 2 * S * 0.95);
-    var bodyMat = new THREE.MeshLambertMaterial({ color: SKEWB_COLORS.dark });
+    var bodyMat = new THREE.MeshLambertMaterial({ color: SKEWB_COLORS.dark, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
     skewbState.body = new THREE.Mesh(bodyGeom, bodyMat);
     skewbState.group.add(skewbState.body);
 
