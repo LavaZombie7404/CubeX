@@ -160,16 +160,21 @@ function createSkewb() {
         var v0 = [cx, cy, cz];
 
         // Y-normal face (U/D): v0, vx, vz — all at y = cy
+        var yColor = SKEWB_COLORS[getFaceColor(0, cd.sy, 0)];
         var yPts = raisePolygon(shrinkPolygon([v0, vx, vz], SKEWB_GAP), 0, cd.sy, 0, SKEWB_RAISE);
-        meshes.push(createStickerMesh(yPts, SKEWB_COLORS[getFaceColor(0, cd.sy, 0)], 0, cd.sy, 0));
+        meshes.push(createStickerMesh(yPts, yColor, 0, cd.sy, 0));
 
         // Z-normal face (F/B): v0, vx, vy — all at z = cz
+        var zColor = SKEWB_COLORS[getFaceColor(0, 0, cd.sz)];
         var zPts = raisePolygon(shrinkPolygon([v0, vx, vy], SKEWB_GAP), 0, 0, cd.sz, SKEWB_RAISE);
-        meshes.push(createStickerMesh(zPts, SKEWB_COLORS[getFaceColor(0, 0, cd.sz)], 0, 0, cd.sz));
+        meshes.push(createStickerMesh(zPts, zColor, 0, 0, cd.sz));
 
         // X-normal face (R/L): v0, vy, vz — all at x = cx
+        var xColor = SKEWB_COLORS[getFaceColor(cd.sx, 0, 0)];
         var xPts = raisePolygon(shrinkPolygon([v0, vy, vz], SKEWB_GAP), cd.sx, 0, 0, SKEWB_RAISE);
-        meshes.push(createStickerMesh(xPts, SKEWB_COLORS[getFaceColor(cd.sx, 0, 0)], cd.sx, 0, 0));
+        meshes.push(createStickerMesh(xPts, xColor, cd.sx, 0, 0));
+
+        console.log('Corner', ci, 'colors: Y=0x'+yColor.toString(16), 'Z=0x'+zColor.toString(16), 'X=0x'+xColor.toString(16));
 
         // Internal cut face: vx, vy, vz
         meshes.push(createStickerMesh([vx, vy, vz], SKEWB_COLORS.dark, -cd.sx, -cd.sy, -cd.sz));
