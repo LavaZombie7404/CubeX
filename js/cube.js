@@ -1,8 +1,8 @@
 const CUBE_COLORS = {
-    top: 0xffff00,      // yellow
-    bottom: 0x0000ff,   // blue
-    front: 0xffffff,    // white
-    back: 0x00ff00,     // green
+    top: 0xffffff,      // white
+    bottom: 0xffff00,   // yellow
+    front: 0x00ff00,    // green
+    back: 0x0000ff,     // blue
     right: 0xff0000,    // red
     left: 0xffa500      // orange
 };
@@ -1354,8 +1354,8 @@ function solveFromHistory(onComplete) {
         const move = reversedMoves[index++];
         if (move.type === 'pyraminx') {
             rotatePyraminxLayer(move.face, !move.clockwise, move.wide, next);
-        } else if (move.type === 'skewb') {
-            rotateSkewbMove(move.move, !move.clockwise, next);
+        } else if (move.type === 'ivy') {
+            rotateIvyMove(move.move, !move.clockwise, next);
         } else {
             rotateCubeLayer(move.face, !move.clockwise, next);
         }

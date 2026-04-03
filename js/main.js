@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setupPyraminxControls();
     setupCubeControls();
-    setupSkewbControls();
+    setupIvyControls();
     setupMoveButtons();
     setupPuzzleSelector();
     setupCuboidButtons();
@@ -54,7 +54,7 @@ function setupPuzzleSelector() {
     const cubeMoves = document.getElementById('cube-moves');
     const cuboidMoves = document.getElementById('cuboid-moves');
     const floppyMoves = document.getElementById('floppy-moves');
-    const skewbMoves = document.getElementById('skewb-moves');
+    const ivyMoves = document.getElementById('ivy-moves');
     const diagramPanel = document.getElementById('diagram-panel');
     const figureSection = document.getElementById('figure-section');
     const figureSelect = document.getElementById('figure-select');
@@ -84,125 +84,75 @@ function setupPuzzleSelector() {
         cubeState.isAnimating = false;
         cubeState.animationQueue = [];
 
-        skewbState.group = null;
-        skewbState.pieces = [];
-        skewbState.body = null;
-        skewbState.isAnimating = false;
-        skewbState.animationQueue = [];
+        ivyState.group = null;
+        ivyState.corners = [];
+        ivyState.centers = [];
+        ivyState.body = null;
+        ivyState.isAnimating = false;
+        ivyState.animationQueue = [];
+
+        // Hide all move panels
+        pyraminxMoves.style.display = 'none';
+        cubeMoves.style.display = 'none';
+        cuboidMoves.style.display = 'none';
+        floppyMoves.style.display = 'none';
+        ivyMoves.style.display = 'none';
+        diagramPanel.style.display = 'none';
+        figureSection.style.display = 'none';
+        floppyFigureSection.style.display = 'none';
+        cube1FigureSection.style.display = 'none';
+        mirrorColorSection.style.display = 'none';
 
         // Create new puzzle
         if (puzzle === 'pyraminx') {
             currentPuzzleGroup = createPyraminx();
             pyraminxMoves.style.display = 'flex';
-            cubeMoves.style.display = 'none';
-            cuboidMoves.style.display = 'none';
-            floppyMoves.style.display = 'none';
-            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
-            figureSection.style.display = 'none';
-            floppyFigureSection.style.display = 'none';
-            cube1FigureSection.style.display = 'none';
-            mirrorColorSection.style.display = 'none';
             initPyraminxDiagram();
         } else if (puzzle === 'cube1') {
             var cube1Figure = cube1FigureSelect.value;
             var cube1Color = mirrorColorSelect.value;
             currentPuzzleGroup = createCube(1, cube1Figure, cube1Color);
-            pyraminxMoves.style.display = 'none';
-            cubeMoves.style.display = 'none';
-            cuboidMoves.style.display = 'none';
-            floppyMoves.style.display = 'none';
-            skewbMoves.style.display = 'none';
-            diagramPanel.style.display = 'none';
-            figureSection.style.display = 'none';
-            floppyFigureSection.style.display = 'none';
             cube1FigureSection.style.display = 'block';
             mirrorColorSection.style.display = cube1Figure === 'mirror' ? 'block' : 'none';
         } else if (puzzle === 'cube2') {
             currentPuzzleGroup = createCube(2);
-            pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'flex';
-            cuboidMoves.style.display = 'none';
-            floppyMoves.style.display = 'none';
-            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
-            figureSection.style.display = 'none';
-            floppyFigureSection.style.display = 'none';
-            cube1FigureSection.style.display = 'none';
-            mirrorColorSection.style.display = 'none';
             initDiagram(2);
         } else if (puzzle === 'cube3') {
             currentPuzzleGroup = createCube(3);
-            pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'flex';
-            cuboidMoves.style.display = 'none';
-            floppyMoves.style.display = 'none';
-            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
-            figureSection.style.display = 'none';
-            floppyFigureSection.style.display = 'none';
-            cube1FigureSection.style.display = 'none';
-            mirrorColorSection.style.display = 'none';
             initDiagram(3);
         } else if (puzzle === 'cube4' || puzzle === 'cube5' || puzzle === 'cube6' || puzzle === 'cube7') {
             var cubeSize = parseInt(puzzle.replace('cube', ''));
             currentPuzzleGroup = createCube(cubeSize);
-            pyraminxMoves.style.display = 'none';
             cubeMoves.style.display = 'flex';
-            cuboidMoves.style.display = 'none';
-            floppyMoves.style.display = 'none';
-            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
-            figureSection.style.display = 'none';
-            floppyFigureSection.style.display = 'none';
-            cube1FigureSection.style.display = 'none';
-            mirrorColorSection.style.display = 'none';
             initDiagram(cubeSize);
         } else if (puzzle === 'floppy') {
             const floppyFigure = floppyFigureSelect.value;
             const mirrorColor = mirrorColorSelect.value;
             currentPuzzleGroup = createFloppyCube(floppyFigure, mirrorColor);
-            pyraminxMoves.style.display = 'none';
-            cubeMoves.style.display = 'none';
-            cuboidMoves.style.display = 'none';
             floppyMoves.style.display = 'flex';
-            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
-            figureSection.style.display = 'none';
             floppyFigureSection.style.display = 'block';
-            cube1FigureSection.style.display = 'none';
             mirrorColorSection.style.display = floppyFigure === 'mirror' ? 'block' : 'none';
             clearDiagram();
         } else if (puzzle === 'cuboid1x2x3') {
             currentFigure = figureSelect.value;
             var cuboidColor = mirrorColorSelect.value;
             currentPuzzleGroup = createCuboid(1, 2, 3, currentFigure, cuboidColor);
-            pyraminxMoves.style.display = 'none';
-            cubeMoves.style.display = 'none';
             cuboidMoves.style.display = 'flex';
-            floppyMoves.style.display = 'none';
-            skewbMoves.style.display = 'none';
             diagramPanel.style.display = 'flex';
             figureSection.style.display = 'block';
-            floppyFigureSection.style.display = 'none';
-            cube1FigureSection.style.display = 'none';
             mirrorColorSection.style.display = currentFigure === 'mirror' ? 'block' : 'none';
-            // Show correct move buttons for current figure
             updateCuboidMoveButtons(currentFigure);
-            // Clear diagram for cuboid (no diagram yet)
             clearDiagram();
-        } else if (puzzle === 'skewb') {
-            currentPuzzleGroup = createSkewb();
-            pyraminxMoves.style.display = 'none';
-            cubeMoves.style.display = 'none';
-            cuboidMoves.style.display = 'none';
-            floppyMoves.style.display = 'none';
-            skewbMoves.style.display = 'flex';
-            diagramPanel.style.display = 'none';
-            figureSection.style.display = 'none';
-            floppyFigureSection.style.display = 'none';
-            cube1FigureSection.style.display = 'none';
-            mirrorColorSection.style.display = 'none';
+        } else if (puzzle === 'ivy') {
+            currentPuzzleGroup = createIvy();
+            ivyMoves.style.display = 'flex';
         }
 
         sceneRef.add(currentPuzzleGroup);
@@ -237,13 +187,13 @@ function setupMoveButtons() {
         });
     });
 
-    // Skewb buttons
-    const skewbButtons = document.querySelectorAll('#skewb-moves .skewb-btn');
-    skewbButtons.forEach(btn => {
+    // Ivy buttons
+    const ivyButtons = document.querySelectorAll('#ivy-moves .ivy-btn');
+    ivyButtons.forEach(btn => {
         btn.addEventListener('click', function() {
             const move = this.dataset.move;
             const clockwise = this.dataset.cw === 'true';
-            rotateSkewbMove(move, clockwise);
+            rotateIvyMove(move, clockwise);
         });
     });
 }
@@ -403,8 +353,8 @@ function setupScrambleButton() {
             scramblePyraminx(15, onComplete);
         } else if (currentPuzzle === 'floppy') {
             scrambleFloppyCube(10, onComplete);
-        } else if (currentPuzzle === 'skewb') {
-            scrambleSkewb(15, onComplete);
+        } else if (currentPuzzle === 'ivy') {
+            scrambleIvy(10, onComplete);
         } else if (currentPuzzle.startsWith('cube') || currentPuzzle.startsWith('cuboid')) {
             scrambleCube(null, onComplete);
         }
@@ -447,7 +397,7 @@ function setupSolveButton() {
     const solveBtn = document.getElementById('solve-btn');
 
     solveBtn.addEventListener('click', function() {
-        if (cubeState.isAnimating || pyraminxState.isAnimating || skewbState.isAnimating) return;
+        if (cubeState.isAnimating || pyraminxState.isAnimating || ivyState.isAnimating) return;
 
         solveBtn.disabled = true;
         solveBtn.textContent = 'Solving...';
