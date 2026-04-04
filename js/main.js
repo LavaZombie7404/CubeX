@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupCube1FigureSelector();
     setupScrambleButton();
     setupSolveButton();
+    setupTimer();
 
     // Initialize diagram for default puzzle
     initDiagram(3);
@@ -64,6 +65,8 @@ function setupPuzzleSelector() {
     const mirrorColorSelect = document.getElementById('mirror-color-select');
     const cube1FigureSection = document.getElementById('cube1-figure-section');
     const cube1FigureSelect = document.getElementById('cube1-figure-select');
+    const timerOverlay = document.getElementById('timer-overlay');
+    const movesSection = document.getElementById('moves-section');
 
     selector.addEventListener('change', function() {
         const puzzle = this.value;
@@ -102,6 +105,10 @@ function setupPuzzleSelector() {
         floppyFigureSection.style.display = 'none';
         cube1FigureSection.style.display = 'none';
         mirrorColorSection.style.display = 'none';
+        timerOverlay.style.display = 'none';
+        timerState.active = false;
+        resetTimer();
+        movesSection.style.display = 'block';
 
         // Create new puzzle
         if (puzzle === 'pyraminx') {
@@ -153,6 +160,13 @@ function setupPuzzleSelector() {
         } else if (puzzle === 'ivy') {
             currentPuzzleGroup = createIvy();
             ivyMoves.style.display = 'flex';
+        } else if (puzzle === 'timer') {
+            timerOverlay.style.display = 'flex';
+            timerState.active = true;
+            movesSection.style.display = 'none';
+            currentPuzzle = 'timer';
+            resetTimer();
+            return;
         }
 
         sceneRef.add(currentPuzzleGroup);

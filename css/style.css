@@ -60,6 +60,7 @@ body {
     flex-direction: column;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     min-width: 0;
+    position: relative;
 }
 
 .viewer-panel {
@@ -675,6 +676,41 @@ body {
 
 .instructions li {
     margin-bottom: 4px;
+}
+
+/* Timer */
+.timer-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-dark);
+    z-index: 20;
+    user-select: none;
+}
+
+.timer-display {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: clamp(3.2rem, 8vw, 8rem);
+    font-weight: bold;
+    color: var(--text);
+    letter-spacing: 6px;
+}
+
+.timer-display.holding {
+    color: var(--accent);
+}
+
+.timer-display.ready {
+    color: #4ecca3;
+}
+
+.timer-display.running {
+    color: var(--text);
 }
 
 /* Cuboid move buttons */

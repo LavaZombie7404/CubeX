@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CubeX - Learn to Solve Puzzles</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
     <header class="header">
@@ -15,6 +15,9 @@
     <main class="container">
         <!-- Left Panel: 3D Viewer + Diagram -->
         <section class="left-panel">
+            <div class="timer-overlay" id="timer-overlay" style="display: none;">
+                <div class="timer-display" id="timer-display">00:00:000</div>
+            </div>
             <div class="viewer-panel" id="viewer">
                 <!-- Three.js canvas will be inserted here -->
             </div>
@@ -176,6 +179,7 @@
                     <option value="floppy">1x3x3 Floppy</option>
                     <option value="cuboid1x2x3">1x2x3 Cuboid</option>
                     <option value="ivy">Ivy Cube</option>
+                    <option value="timer">Timer</option>
                 </select>
 
                 <div id="figure-section" style="display: none;">
@@ -257,7 +261,8 @@
     <script src="js/ivy.js"></script>
     <script src="js/diagram.js"></script>
     <script src="js/scene.js"></script>
+    <script src="js/timer.js?v=3"></script>
     <script src="js/camera.js"></script>
-    <script src="js/main.js"></script>
+    <script src="js/main.js?v=2"></script>
 </body>
 </html>
